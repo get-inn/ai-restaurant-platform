@@ -1,0 +1,170 @@
+
+GET INN: AI-Native Operating System for Michelin-Star Restaurant Chains
+
+Drawing inspiration from modern SaaS dashboards like Monday.com, Notion, and hotel management systems. 
+Create a clean, professional interface with intuitive navigation and a focus on usability.
+
+Primary: Deep navy blue (#1a365d) for professional appearance
+Secondary: Teal accent (#2c7a7b) for highlights and interactive elements
+Neutral grays for content areas
+Strategic use of white space for readability
+Subtle shadows and rounded corners for depth
+
+1. Header:
+- Restaurant chain logo
+- GET INN App logo
+- Theme Switcher: 
+Light Theme: The default theme is bright and minimalistic, with a light background and dark text for a clean, professional look.
+Dark Theme: The dark theme offers a darker background with light text, designed for users who prefer lower screen brightness or work in low-light environments.
+
+2. Sidebar Navigation
+The sidebar navigation allows users to easily access the core modules of the application. Each menu have sub-menu.
+
+- Dashboard
+- AI Supplier
+  → Reconciliation
+  → Inventory
+- AI Labor
+  → Onboarding
+- AI Chef
+  → Menu
+- Settings
+- User Settings
+- Company Settings
+- Subscription
+
+3. AI Supplier: Centralized Procurement Excellence
+
+3.1. AI Supplier - Reconciliation
+
+For chain management, module will provide a high-level Reconciliation Status view for all restaurants, using green, orange, or red indicators to signal the health of procurement reconciliation at each location.
+
+Trere are 3 tabs:
+- Overview tab: List of restaurants and reconcilation status
+- Documents tab: Reconcilation ducuments uploads (with 8-step reconciliation process)
+- History tab: 
+
+3.2. AI Supplier → Inventory
+
+For chain management, module will provide a high-level Inventory Status view for all restaurants, using green, orange, or red indicators to signal the health of inventory at each location.
+
+Trere are 3 tabs:
+- Overview: high-level Inventory Status view for all restaurants, using green, orange, or red indicators to signal the health of inventory at each location.
+- Ingredients: Ingredient-level analysis: name, price change %, dish usage count, % of total sales
+- Settings: Define % and recommended inventory level for each ingredient
+
+4. AI Labor: Nurturing Your Culinary Brigade
+
+This module embodies the nurturing mentorship of a head chef developing their brigade, consistently applied across your entire organization. 
+
+4.1. AI Labor → Onboarding
+
+Trere are 2 tabs:
+- Overview: Number of staff onboarding in each location
+- Details: List of employess (Name, Location, Onboarding starting date, Planned final exam date)
+
+
+5. AI Chef: Culinary Artistry Meets Data-Driven Insight Across Your Chain
+5.1. AI Chef → Menu
+
+There are 1 tab:
+ABC-Menu analysis
+
+6. User Settings
+In the User Settings section, users can personalize their app experience:
+
+Theme Switcher: Switch between Light and Dark themes to match user preferences.
+
+Account Details: Manage the user's account information such as name, email, and password.
+
+Notification Preferences: Customize the types of notifications users receive (e.g., new dish suggestions, stock levels, order status).
+
+Language Preferences: Select the preferred language for the interface.
+
+Security Settings: Configure two-factor authentication (2FA) and other security features.
+
+7. Company Settings
+The Company Settings module allows users to configure restaurant-specific preferences:
+
+Business Information: Enter the company’s name, contact information, and business hours.
+
+Payment Methods: Set up and manage payment options such as credit card, bank accounts, and online payment providers.
+
+Integrations: Configure third-party integrations with POS systems, ERP software, and other tools that the restaurant uses.
+
+Branding & Customization: Upload logos, set theme colors, and other branding-related settings to personalize the application.
+
+Employee Management: Add and manage restaurant employees, assign roles and permissions, and manage access to different sections of the app.
+
+8. Subscription
+The Subscription section helps users manage their service plans:
+
+View Subscription: Display the current subscription plan, renewal date, and plan features.
+
+Upgrade/Downgrade Plan: Allow users to switch between available subscription tiers based on their needs (e.g., basic, premium, enterprise).
+
+Billing Information: Manage payment details such as credit cards, invoices, and past payments.
+
+Usage Limits: Track usage limits (e.g., number of users, dishes per month) depending on the subscription tier.
+
+Cancel Subscription: Provide an option to cancel or pause the subscription with relevant details.
+
+9. Workflow and User Experience
+Dashboard Overview: The main dashboard displays key metrics for the restaurant chain, stock levels, and performance reports.
+
+Interactive Interface: The app provides a clean and user-friendly interface, with drag-and-drop features for menu creation, inventory management, and campaign setup.
+
+User Experience with Themes:
+Light Theme: The default theme is bright and minimalistic, with a light background and dark text for a clean, professional look.
+Dark Theme: The dark theme offers a darker background with light text, designed for users who prefer lower screen brightness or work in low-light environments.
+
+
+10. API endpoints:
+For the initial development phase, we'd like you to create a fully functional frontend with mocked API data. Please implement mock API endpoints that return realistic test data for the following core endpoints, ensuring they can provide both single-restaurant and aggregated chain-wide data where appropriate:
+
+10.1. Authentication Endpoints
+POST /v1/api/auth/login - User login
+POST /v1/api/auth/logout - User logout
+POST /v1/api/auth/refresh - Refresh authentication token
+GET /v1/api/auth/me - Get current user information
+
+10.2. AI Supplier Module Endpoints
+# Document Management
+POST /v1/api/supplier/documents - Upload new document
+GET /v1/api/supplier/documents - Get list of documents (can filter by restaurant_id or get all for chain)
+GET /v1/api/supplier/documents/{id} - Get document details
+
+# Reconciliation
+POST /v1/api/supplier/reconciliation - Start reconciliation process (can specify restaurant_id)
+GET /v1/api/supplier/reconciliation/chain-status - Get reconciliation status across all restaurants in the chain (returns green/orange/red per restaurant)
+GET /v1/api/supplier/reconciliation/{id}/status - Get specific reconciliation status
+GET /v1/api/supplier/reconciliation/{id}/matched - Get matched items
+GET /v1/api/supplier/reconciliation/{id}/missing-restaurant - Get items missing in restaurant
+GET /v1/api/supplier/reconciliation/{id}/missing-supplier - Get items missing in supplier document
+
+# Inventory
+GET /v1/api/supplier/inventory/items - List inventory items (can filter by restaurant_id or get aggregated chain view)
+GET /v1/api/supplier/inventory/price-changes - Get price changes (can filter by restaurant_id or get aggregated chain view)
+GET /v1/api/supplier/inventory/price-history/{id} - Get price history
+
+10.3. AI Labor Module Endpoints
+GET /v1/api/labor/onboarding/chain-status - List onboarding status across all restaurants (returns green/orange/red per restaurant)
+GET /v1/api/labor/onboarding/restaurant/{restaurant_id} - Staff by specific restaurant
+GET /v1/api/labor/onboarding/{id} - Get specific onboarding details
+
+10.4. AI Chef Module Endpoints
+
+GET /v1/api/chef/menu/abc-analysis - Get ABC analysis (can filter by restaurant_id or get aggregated chain view)
+GET /v1/api/chef/menu/item/{id}/performance - Get item performance
+GET /v1/api/chef/menu/insights - Get AI-generated insights (can filter by restaurant_id or get aggregated chain view)
+GET /v1/api/chef/menu/performance/chain-status - Get menu performance status across all restaurants (returns green/orange/red per restaurant)
+
+GET /v1/api/chef/recipes - List recipes (can filter by restaurant_id or get global recipes)
+GET /v1/api/chef/recipes/{id} - Get recipe details
+GET /v1/api/chef/recipes/adherence/chain-status - Get recipe adherence status across all restaurants (returns green/orange/red per restaurant, potentially based on inventory or other metrics)
+
+10.5. WebSocket Endpoints
+WS /ws/supplier/reconciliation/{reconciliation_id} - Real-time reconciliation updates (per-restaurant)
+WS /ws/chain/updates - Real-time aggregate chain-level updates (e.g., changes in status for a restaurant)
+
+For each endpoint, please create realistic test data that showcases the full potential of the interface. 

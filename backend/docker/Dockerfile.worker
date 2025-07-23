@@ -1,0 +1,28 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app
+
+# Install Python dependencies
+COPY backend/requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir email-validator==2.1.0.post1 openai==1.93.0
+RUN pip uninstall -y numpy pandas && pip install numpy==1.23.5 pandas==1.5.3
+
+# Copy application code
+COPY backend /app
+
+# Run Celery worker
+WORKDIR /app
+CMD ["bash", "-c", "ls -la && PYTHONPATH=/app celery -A src.worker.celery_app worker --loglevel=info"]

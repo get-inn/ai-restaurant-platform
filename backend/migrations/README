@@ -1,0 +1,4 @@
+Generic single-database configuration for Alembic.
+
+For more information on Alembic, please see:
+https://alembic.sqlalchemy.org

@@ -1,0 +1,127 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* GET INN Theme System - Updated Purple Brand Colors */
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 210 11% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 210 11% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 210 11% 15%;
+
+    --primary: 244 31% 55%; /* #6B64B4 */
+    --primary-foreground: 0 0% 98%;
+
+    --secondary: 244 25% 45%; /* Darker purple */
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --accent: 244 35% 90%;
+    --accent-foreground: 244 31% 55%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 244 31% 55%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 244 31% 55%; /* #6B64B4 */
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 244 25% 45%; /* Darker Purple */
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 244 35% 70%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 244 31% 50%;
+    --sidebar-ring: 244 35% 50%;
+  }
+
+  .dark {
+    --background: 244 30% 8%;
+    --foreground: 0 0% 98%;
+
+    --card: 244 30% 10%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 244 30% 10%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 244 31% 70%;
+    --primary-foreground: 244 30% 8%;
+
+    --secondary: 244 25% 23%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 244 30% 15%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 244 30% 15%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 244 30% 20%;
+    --input: 244 30% 20%;
+    --ring: 244 31% 70%;
+
+    --sidebar-background: 244 30% 5%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 244 31% 70%;
+    --sidebar-primary-foreground: 244 30% 8%;
+    --sidebar-accent: 244 30% 12%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 244 30% 15%;
+    --sidebar-ring: 244 31% 70%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Status Indicators */
+.status-healthy {
+  @apply bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400;
+}
+
+.status-warning {
+  @apply bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400;
+}
+
+.status-critical {
+  @apply bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400;
+}
+
+/* Custom scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  @apply bg-muted/20;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  @apply bg-muted-foreground/30 rounded-full;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  @apply bg-muted-foreground/50;
+}

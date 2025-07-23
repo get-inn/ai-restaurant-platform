@@ -1,0 +1,89 @@
+
+services:
+#  backend:
+#    build:
+#      context: ../..
+#      dockerfile: backend/docker/Dockerfile.backend
+#    ports:
+#      - "8000:8000"
+#    volumes:
+#      - ../src:/app/src
+#      - ../requirements.txt:/app/requirements.txt
+#    env_file:
+#      - ../.env
+#    depends_on:
+#      - db
+#      - redis
+#    networks:
+#      - restaurant-network
+#    environment:
+#      - DATABASE_URL=postgresql://postgres:postgres@db:5432/restaurant
+#      - DATABASE_SCHEMA=getinn_ops
+#      - CELERY_BROKER_URL=redis://redis:6379/0
+#      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+#      - INITIALIZE_DB=true
+#      - RESET_DB=false
+#      # Bot conversation logging settings
+#      - BOT_LOG_LEVEL=DEBUG
+#      - BOT_LOG_FORMAT=json
+#      - BOT_FILE_LOGGING=false
+#
+#  worker:
+    build:
+      context: ../..
+      dockerfile: backend/docker/Dockerfile.worker
+    volumes:
+      - ../src:/app/src
+      - ../requirements.txt:/app/requirements.txt
+    env_file:
+      - ../.env
+    depends_on:
+      - db
+      - redis
+    networks:
+      - restaurant-network
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/restaurant
+      - DATABASE_SCHEMA=getinn_ops
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      # Bot conversation logging settings
+      - BOT_LOG_LEVEL=DEBUG
+      - BOT_LOG_FORMAT=json
+      - BOT_FILE_LOGGING=false
+
+  db:
+    image: postgres:15
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=restaurant
+    ports:
+      - "5432:5432"
+    networks:
+      - restaurant-network
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    networks:
+      - restaurant-network
+
+  adminer:
+    image: adminer
+    ports:
+      - "8080:8080"
+    networks:
+      - restaurant-network
+    depends_on:
+      - db
+
+networks:
+  restaurant-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

@@ -1,0 +1,3 @@
+"""
+Supplier module route collection
+"""
