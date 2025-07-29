@@ -26,7 +26,7 @@ The webhook management system automatically configures and maintains Telegram we
 ### Set Webhook
 
 ```
-POST /v1/api/webhooks/telegram/{bot_id}/webhook/set
+POST /v1/api/webhooks/telegram/{bot_id}/set
 ```
 
 Sets or updates a webhook for the specified bot.
@@ -58,7 +58,7 @@ Sets or updates a webhook for the specified bot.
 ### Get Webhook Status
 
 ```
-GET /v1/api/webhooks/telegram/{bot_id}/webhook/status
+GET /v1/api/webhooks/telegram/{bot_id}/status
 ```
 
 Retrieves current webhook status for the specified bot.
@@ -80,7 +80,7 @@ Retrieves current webhook status for the specified bot.
 ### Delete Webhook
 
 ```
-POST /v1/api/webhooks/telegram/{bot_id}/webhook/delete
+POST /v1/api/webhooks/telegram/{bot_id}/delete
 ```
 
 Deletes the webhook for the specified bot.
@@ -197,7 +197,7 @@ To debug webhook issues:
 
 1. Check webhook status:
    ```
-   GET /v1/api/webhooks/telegram/{bot_id}/webhook/status
+   GET /v1/api/webhooks/telegram/{bot_id}/status
    ```
 
 2. Examine logs for webhook-related errors:
