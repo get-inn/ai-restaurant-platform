@@ -145,3 +145,5 @@ temp/
 /.nuxt/
 /.output/
 backend/.bot_id_storage
+backend/docs/modules/bot-management/example-scenario/onboarding_scenario.json
+backend/docs/modules/bot-management/example-scenario/chiho-history.png

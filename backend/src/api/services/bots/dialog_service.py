@@ -253,16 +253,30 @@ class DialogService:
         return None
     
     @staticmethod
-    def _replace_variables(message_data: Dict[str, Any], collected_data: Dict[str, Any]) -> Dict[str, Any]:
+    def _replace_variables(message_data: Dict[str, Any], collected_data: Dict[str, Any], scenario_data: Dict[str, Any] = None) -> Dict[str, Any]:
         """
         Replace variable placeholders in message text with collected data values.
         Variable format is {{variable_name}}.
+        
+        Args:
+            message_data: The message data containing placeholders
+            collected_data: Dictionary of collected user data
+            scenario_data: The complete scenario definition containing variable mappings
+            
+        Returns:
+            Message data with variables replaced by their values
         """
         if not message_data or not collected_data:
             return message_data
             
         # Create a copy of the message data to avoid modifying the original
         result = dict(message_data)
+        
+        # Get variable mappings if available
+        variables_mapping = {}
+        if scenario_data and "variables_mapping" in scenario_data:
+            variables_mapping = scenario_data.get("variables_mapping", {})
+            logger.debug(f"Found variable mappings in scenario: {variables_mapping.keys()}")
         
         # Process text field if it exists
         if "text" in result and isinstance(result["text"], str):
@@ -273,9 +287,19 @@ class DialogService:
             
             def replace_var(match):
                 var_name = match.group(1)
-                if var_name in collected_data:
-                    return str(collected_data[var_name])
-                return match.group(0)  # Return original if not found
+                if var_name not in collected_data:
+                    return match.group(0)  # Return original if not found
+                    
+                var_value = str(collected_data[var_name])
+                
+                # Apply mapping if available
+                if var_name in variables_mapping and var_value in variables_mapping[var_name]:
+                    mapped_value = str(variables_mapping[var_name][var_value])
+                    logger.info(f"Variable '{var_name}' mapped from '{var_value}' to '{mapped_value}'")
+                    return mapped_value
+                
+                logger.debug(f"Variable '{var_name}' substituted with value '{var_value}'")
+                return var_value
                 
             # Use re.sub to replace all variables
             text = re.sub(pattern, replace_var, text)
@@ -381,7 +405,7 @@ class DialogService:
             
             # Process the message to replace variables
             message = step_data.get("message", {})
-            processed_message = DialogService._replace_variables(message, {})
+            processed_message = DialogService._replace_variables(message, {}, scenario.scenario_data)
             
             return {
                 "message": processed_message,
@@ -490,7 +514,7 @@ class DialogService:
                 if next_step_data:
                     # Process the message to replace variables
                     message = next_step_data.get("message", {})
-                    processed_message = DialogService._replace_variables(message, dialog_state.collected_data)
+                    processed_message = DialogService._replace_variables(message, dialog_state.collected_data, scenario.scenario_data)
                     
                     return {
                         "message": processed_message,
@@ -500,7 +524,7 @@ class DialogService:
             
             # Process the message to replace variables
             message = {"text": "I'm not sure what to do next."}
-            processed_message = DialogService._replace_variables(message, dialog_state.collected_data)
+            processed_message = DialogService._replace_variables(message, dialog_state.collected_data, scenario.scenario_data)
             
             return {
                 "message": processed_message,

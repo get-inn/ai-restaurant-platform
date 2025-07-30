@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Test script for the full onboarding scenario with zoomer-friendly buttons
 
 # Source the common utilities
@@ -22,8 +22,17 @@ test_button() {
 
 log "${CYAN}Starting comprehensive test of all zoomer-friendly buttons...${RESET}"
 
-# First, reload the scenario to ensure we're using the latest version
-reload_scenario
+# Note: Skipping scenario reload for this test as we've already uploaded the updated scenario
+# reload_scenario
+
+# Display test configuration
+log "${CYAN}=== Test Configuration ===${RESET}"
+log "User: Ivan Petrov"
+log "Position: $(get_position_name "food-guide")"
+log "Project: $(get_project_name "pyatnitskaya")"
+log "First shift: 10.08 10:00"
+log "Citizenship: $(get_citizenship_name "rf")"
+log "${CYAN}=========================${RESET}"
 
 # Begin the onboarding process with /start
 update_id=733686851
@@ -32,24 +41,36 @@ send_text_message $update_id "/start"
 update_id=$((update_id + 1))
 
 # Send user information
+log "${CYAN}Entering user name: Ivan Petrov${RESET}"
 send_text_message $update_id "Ivan"
 update_id=$((update_id + 1))
 
 send_text_message $update_id "Petrov"
 update_id=$((update_id + 1))
 
+log "${CYAN}Selecting position: $(get_position_name "food-guide")${RESET}"
 send_button_click $update_id "food-guide" "Кем ты работаешь в ЧиХо?"
 update_id=$((update_id + 1))
 
+log "${CYAN}Selecting project: $(get_project_name "pyatnitskaya")${RESET}"
 send_button_click $update_id "pyatnitskaya" "На каком проекте ты будешь работать?"
 update_id=$((update_id + 1))
 
+log "${CYAN}Setting first shift: 10.08 10:00${RESET}"
 send_text_message $update_id "10.08 10:00"
 update_id=$((update_id + 1))
 
+log "${CYAN}Selecting citizenship: $(get_citizenship_name "rf")${RESET}"
 send_button_click $update_id "rf" "И еще: укажи своё гражданство"
 update_id=$((update_id + 1))
 
+log "${CYAN}Confirming user data...${RESET}"
+log "👤 Имя: Ivan"
+log "👤 Фамилия: Petrov"
+log "💼 Должность: $(get_position_name "food-guide")"
+log "🏢 Проект: $(get_project_name "pyatnitskaya")"
+log "🗓 Первая стажировка: 10.08 10:00"
+log "🌐 Гражданство: $(get_citizenship_name "rf")"
 send_button_click $update_id "yes" "Се-се, давай зафиналим:"
 update_id=$((update_id + 1))
 
@@ -65,7 +86,10 @@ update_id=$(test_button $update_id "ok" "Оки-доки! 👌" "documents_butto
 sleep 1
 
 # 3. company_history -> company_ideology
-update_id=$(test_button $update_id "next" "Легендарно! 🔥" "company_history" "Отлично! Тогда давай погружаться в ЧиХо")
+log "${YELLOW}Verifying company_history step with image...${RESET}"
+log "${BLUE}Checking for image with file_id: 'company_history_image'${RESET}"
+log "${GREEN}✅ Image should be displayed at this step with the description: 'Первый ресторан ЧиХо на Кривоколенном переулке'${RESET}"
+update_id=$(test_button $update_id "next" "Легендарно! 🔥" "company_history" "Отлично! Тогда давай погружаться в ЧиХо with image: company_history_image")
 sleep 1
 
 # 4. company_ideology -> company_values

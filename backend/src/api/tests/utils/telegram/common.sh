@@ -336,7 +336,8 @@ run_onboarding_flow_to() {
   if [ "$target_step" = "company_history" ]; then return; fi
   
   # Continue through company_history to company_ideology
-  send_button_click $update_id "next" "Отлично! Тогда давай погружаться в ЧиХо..." $silent
+  # Note: This step now includes an image with file_id "company_history_image"
+  send_button_click $update_id "next" "Отлично! Тогда давай погружаться в ЧиХо with image: company_history_image" $silent
   update_id=$((update_id + 1))
   
   # Break if we've reached the target step

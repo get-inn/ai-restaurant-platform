@@ -68,7 +68,7 @@ async def upload_media_file(
             )
         
         # Use a directory inside the settings-defined storage location
-        storage_dir = os.path.join(settings.media_storage_path, "bot_media")
+        storage_dir = os.path.join(settings.MEDIA_STORAGE_PATH, "bot_media")
         
         media_file = await MediaService.create_media_file(db, file, bot_id, storage_dir)
         if not media_file:
