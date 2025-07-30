@@ -73,7 +73,7 @@ class StateRepository:
             return self._cache[cache_key]
             
         # Query the database
-        self.logger.debug(LogEventType.STATE, "Querying dialog state from database", 
+        self.logger.debug(LogEventType.STATE_CHANGE, "Querying dialog state from database", 
                        {"bot_id": str(bot_id), "platform": platform, "platform_chat_id": platform_chat_id})
         query = (
             select(BotDialogState)
@@ -101,11 +101,11 @@ class StateRepository:
             }
             # Update cache
             self._cache[cache_key] = state_dict
-            self.logger.debug(LogEventType.STATE, "Dialog state retrieved from database", 
+            self.logger.debug(LogEventType.STATE_CHANGE, "Dialog state retrieved from database", 
                            {"current_step": dialog_state.current_step})
             return state_dict
             
-        self.logger.debug(LogEventType.STATE, "No dialog state found")
+        self.logger.debug(LogEventType.STATE_CHANGE, "No dialog state found")
         return None
         
     async def create_dialog_state(
@@ -207,7 +207,7 @@ class StateRepository:
             return None
             
         # Update fields
-        self.logger.debug(LogEventType.STATE, f"Updating dialog state {state_id}", 
+        self.logger.debug(LogEventType.STATE_CHANGE, f"Updating dialog state {state_id}", 
                        {"update_keys": list(update_data.keys())})
         
         for key, value in update_data.items():
@@ -228,7 +228,7 @@ class StateRepository:
                 
         # Always update last_interaction_at when updating dialog state
         db_dialog_state.last_interaction_at = datetime.now()
-        self.logger.debug(LogEventType.STATE, "Updated last_interaction_at timestamp")
+        self.logger.debug(LogEventType.STATE_CHANGE, "Updated last_interaction_at timestamp")
         
         await self.db.commit()
         await self.db.refresh(db_dialog_state)
@@ -280,7 +280,7 @@ class StateRepository:
             # This will cascade delete history entries
             await self.db.delete(dialog_state)
             await self.db.commit()
-            self.logger.info(LogEventType.STATE, f"Dialog state deleted: {state_id}", 
+            self.logger.info(LogEventType.STATE_CHANGE, f"Dialog state deleted: {state_id}", 
                            {"platform": dialog_state.platform, "platform_chat_id": dialog_state.platform_chat_id})
             return True
         except Exception as e:

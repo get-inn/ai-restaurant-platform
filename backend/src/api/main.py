@@ -216,6 +216,34 @@ app.include_router(
     tags=["webhooks"],
 )
 
+# Special case for simplified webhook URL used with ngrok in local development
+from src.api.routers.webhooks.telegram import telegram_webhook
+from uuid import UUID
+from fastapi import Request, Depends
+from src.api.dependencies.async_db import get_async_db
+from sqlalchemy.ext.asyncio import AsyncSession
+
+@app.post("/telegram")
+async def simplified_telegram_webhook(request: Request, db: AsyncSession = Depends(get_async_db)):
+    """
+    Simplified Telegram webhook endpoint for local development with ngrok.
+    This is needed because Telegram's webhook validation can sometimes fail with complex URLs.
+    This endpoint forwards requests to the proper handler with the default test bot ID.
+    """
+    try:
+        # Read the update_data
+        update_data = await request.json()
+        logger.info(f"Received simplified webhook request: {update_data}")
+        
+        # Use the test bot ID (this should be configured in a more robust way in production)
+        bot_id = UUID("660c1cab-1dc6-46c9-9cab-774c28f0cfe5")
+        
+        # Forward to the normal webhook handler
+        return await telegram_webhook(bot_id, request, db)
+    except Exception as e:
+        logger.error(f"Error in simplified webhook handler: {str(e)}")
+        return {"status": "error", "detail": str(e)}
+
 # Include test endpoints for testing only (disabled in production)
 app.include_router(
     test_endpoints.router,

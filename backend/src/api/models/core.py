@@ -5,6 +5,7 @@ from src.api.models.base import *
 
 class Account(Base):
     __tablename__ = "account"
+    __table_args__ = {'schema': 'getinn_ops'}
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String, nullable=False)
@@ -28,9 +29,13 @@ class Account(Base):
 class AccountIntegrationCredentials(Base):
     """Account-specific integration credentials"""
     __tablename__ = "account_integration_credentials"
+    __table_args__ = (
+        UniqueConstraint('account_id', 'integration_type', name='uix_account_integration_type'),
+        {'schema': 'getinn_ops'}
+    )
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    account_id = Column(UUID(as_uuid=True), ForeignKey("account.id"), nullable=False)
+    account_id = Column(UUID(as_uuid=True), ForeignKey("getinn_ops.account.id"), nullable=False)
     integration_type = Column(Enum(IntegrationType), nullable=False)  # 'iiko', 'r_keeper', etc.
     credentials = Column(JSONB, nullable=False)  # Encrypted credentials
     base_url = Column(String, nullable=True)  # Optional custom URL
@@ -52,9 +57,10 @@ class AccountIntegrationCredentials(Base):
 
 class Restaurant(Base):
     __tablename__ = "restaurant"
+    __table_args__ = {'schema': 'getinn_ops'}
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    account_id = Column(UUID(as_uuid=True), ForeignKey("account.id"), nullable=False)
+    account_id = Column(UUID(as_uuid=True), ForeignKey("getinn_ops.account.id"), nullable=False)
     name = Column(String, nullable=False)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
@@ -78,9 +84,10 @@ class Restaurant(Base):
 
 class Store(Base):
     __tablename__ = "store"
+    __table_args__ = {'schema': 'getinn_ops'}
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    restaurant_id = Column(UUID(as_uuid=True), ForeignKey("restaurant.id"), nullable=False)
+    restaurant_id = Column(UUID(as_uuid=True), ForeignKey("getinn_ops.restaurant.id"), nullable=False)
     name = Column(String, nullable=False)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
@@ -102,10 +109,11 @@ class Store(Base):
 
 class UserProfile(Base):
     __tablename__ = "user_profile"
+    __table_args__ = {'schema': 'getinn_ops'}
     
     id = Column(UUID(as_uuid=True), primary_key=True)  # Maps to Supabase auth.users.id
-    account_id = Column(UUID(as_uuid=True), ForeignKey("account.id"), nullable=True)
-    restaurant_id = Column(UUID(as_uuid=True), ForeignKey("restaurant.id"), nullable=True)
+    account_id = Column(UUID(as_uuid=True), ForeignKey("getinn_ops.account.id"), nullable=True)
+    restaurant_id = Column(UUID(as_uuid=True), ForeignKey("getinn_ops.restaurant.id"), nullable=True)
     role = Column(String, nullable=False)  # 'admin', 'account_manager', 'restaurant_manager', 'chef'
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())

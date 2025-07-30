@@ -39,7 +39,7 @@ class LogEventType(str, Enum):
     INCOMING = "INCOMING"     # Incoming message from user
     PROCESSING = "PROCESSING" # Processing step
     DECISION = "DECISION"     # Decision point
-    STATE_CHANGE = "STATE"    # State change
+    STATE_CHANGE = "STATE_CHANGE"    # State change
     OUTGOING = "OUTGOING"     # Outgoing message to user
     ERROR = "ERROR"           # Error during processing
     WEBHOOK = "WEBHOOK"       # Webhook event

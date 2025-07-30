@@ -1,6 +1,7 @@
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 import logging
+import re
 
 logger = logging.getLogger("dialog_service")
 from datetime import datetime
@@ -201,6 +202,90 @@ class DialogService:
         return [BotDialogStateDB.model_validate(state) for state in dialog_states]
 
     @staticmethod
+    def _evaluate_conditional_step(condition_data: Dict[str, Any], collected_data: Dict[str, Any]) -> Optional[str]:
+        """
+        Evaluate a conditional next_step based on collected data.
+        Returns the target step ID or None if no condition matches.
+        
+        Condition format is:
+        {
+            "type": "conditional",
+            "conditions": [
+                {"if": "data_confirmed == 'yes'", "then": "first_day_instructions"},
+                {"if": "data_confirmed == 'no'", "then": "welcome"}
+            ]
+        }
+        """
+        if not condition_data or not isinstance(condition_data, dict):
+            return None
+            
+        if condition_data.get("type") != "conditional" or "conditions" not in condition_data:
+            return None
+            
+        conditions = condition_data.get("conditions", [])
+        for condition in conditions:
+            condition_expr = condition.get("if")
+            then_step = condition.get("then")
+            
+            if not condition_expr or not then_step:
+                continue
+                
+            # Parse the condition expression
+            # Simple implementation for expressions like "variable == 'value'"
+            parts = condition_expr.split("==")
+            if len(parts) != 2:
+                continue
+                
+            var_name = parts[0].strip()
+            expected_value = parts[1].strip().strip("'\"")
+            
+            # Check if the variable exists in collected data
+            if var_name in collected_data:
+                actual_value = collected_data.get(var_name)
+                if str(actual_value) == expected_value:
+                    return then_step
+        
+        # If there's an else condition
+        for condition in conditions:
+            if "else" in condition:
+                return condition.get("else")
+                
+        return None
+    
+    @staticmethod
+    def _replace_variables(message_data: Dict[str, Any], collected_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Replace variable placeholders in message text with collected data values.
+        Variable format is {{variable_name}}.
+        """
+        if not message_data or not collected_data:
+            return message_data
+            
+        # Create a copy of the message data to avoid modifying the original
+        result = dict(message_data)
+        
+        # Process text field if it exists
+        if "text" in result and isinstance(result["text"], str):
+            text = result["text"]
+            
+            # Find all variable placeholders and replace them
+            pattern = r'\{\{(\w+)\}\}'
+            
+            def replace_var(match):
+                var_name = match.group(1)
+                if var_name in collected_data:
+                    return str(collected_data[var_name])
+                return match.group(0)  # Return original if not found
+                
+            # Use re.sub to replace all variables
+            text = re.sub(pattern, replace_var, text)
+                    
+            # Update the text in the result
+            result["text"] = text
+            
+        return result
+    
+    @staticmethod
     async def process_user_input(
         db: AsyncSession,
         bot_id: UUID,
@@ -240,7 +325,20 @@ class DialogService:
                 return None
                 
             # Create new dialog state starting with the first step
-            first_step = scenario.scenario_data.get("steps", [])[0].get("id") if scenario.scenario_data.get("steps") else None
+            steps = scenario.scenario_data.get("steps", {})
+            start_step = scenario.scenario_data.get("start_step")
+            first_step = None
+            
+            # Handle different formats of steps: could be list or dictionary
+            if start_step:
+                # If a start step is specified in the scenario, use that
+                first_step = start_step
+            elif isinstance(steps, list) and steps:
+                # If steps is a list, use the first item's id
+                first_step = steps[0].get("id")
+            elif isinstance(steps, dict) and steps:
+                # If steps is a dictionary, use the first key
+                first_step = list(steps.keys())[0]
             
             if not first_step:
                 return None
@@ -255,8 +353,19 @@ class DialogService:
             dialog_state = await DialogService.create_dialog_state(db, dialog_state_create)
             
             # Logic to get the first message from the scenario
-            # This is simplified - a real implementation would have more complex scenario processing
-            step_data = next((s for s in scenario.scenario_data.get("steps", []) if s.get("id") == first_step), None)
+            steps = scenario.scenario_data.get("steps", {})
+            step_data = None
+            
+            # Handle different formats of steps: could be list or dictionary
+            if isinstance(steps, list):
+                # If steps is a list, find the step with matching id
+                step_data = next((s for s in steps if s.get("id") == first_step), None)
+            elif isinstance(steps, dict):
+                # If steps is a dictionary, get the step by key
+                step_data = steps.get(first_step)
+                if step_data is not None and step_data.get("id") is None:
+                    # Ensure the step has an id field
+                    step_data = {**step_data, "id": first_step}
             
             if not step_data:
                 return None
@@ -270,8 +379,12 @@ class DialogService:
             )
             await DialogService.create_dialog_history_entry(db, history_entry)
             
+            # Process the message to replace variables
+            message = step_data.get("message", {})
+            processed_message = DialogService._replace_variables(message, {})
+            
             return {
-                "message": step_data.get("message", {}),
+                "message": processed_message,
                 "buttons": step_data.get("buttons", []),
                 "next_step": step_data.get("next_step")
             }
@@ -305,10 +418,19 @@ class DialogService:
                 return None
                 
             # Find the current step in the scenario
-            current_step_data = next(
-                (s for s in scenario.scenario_data.get("steps", []) if s.get("id") == dialog_state.current_step), 
-                None
-            )
+            steps = scenario.scenario_data.get("steps", {})
+            current_step_data = None
+            
+            # Handle different formats of steps: could be list or dictionary
+            if isinstance(steps, list):
+                # If steps is a list, find the step with matching id
+                current_step_data = next((s for s in steps if s.get("id") == dialog_state.current_step), None)
+            elif isinstance(steps, dict):
+                # If steps is a dictionary, get the step by key
+                current_step_data = steps.get(dialog_state.current_step)
+                if current_step_data is not None and current_step_data.get("id") is None:
+                    # Ensure the step has an id field
+                    current_step_data = {**current_step_data, "id": dialog_state.current_step}
             
             if not current_step_data:
                 return None
@@ -328,26 +450,60 @@ class DialogService:
                 
                 # If there's a next step defined, move to it
                 next_step = current_step_data.get("next_step")
-                if next_step:
+                
+                # Handle different types of next_step values
+                if isinstance(next_step, dict):
+                    # This is a conditional step
+                    evaluated_step = DialogService._evaluate_conditional_step(next_step, collected_data)
+                    if evaluated_step:
+                        # Use the evaluated target step
+                        update_data.current_step = evaluated_step
+                elif next_step:
+                    # This is a simple string step ID
                     update_data.current_step = next_step
                 
                 dialog_state = await DialogService.update_dialog_state(db, dialog_state.id, update_data)
                 
                 # Find the next step in the scenario
-                next_step_data = next(
-                    (s for s in scenario.scenario_data.get("steps", []) if s.get("id") == next_step), 
-                    None
-                ) if next_step else None
+                steps = scenario.scenario_data.get("steps", {})
+                next_step_data = None
+                
+                # Get the updated dialog state after evaluating conditionals
+                dialog_state = await DialogService.get_dialog_state_by_id(db, dialog_state.id)
+                if not dialog_state:
+                    return None
+                    
+                # Use the resolved current_step from the database
+                next_step_id = dialog_state.current_step
+                
+                # Handle different formats of steps: could be list or dictionary
+                if isinstance(steps, list):
+                    # If steps is a list, find the step with matching id
+                    next_step_data = next((s for s in steps if s.get("id") == next_step_id), None)
+                elif isinstance(steps, dict):
+                    # If steps is a dictionary, get the step by key
+                    next_step_data = steps.get(next_step_id)
+                    if next_step_data is not None and next_step_data.get("id") is None:
+                        # Ensure the step has an id field
+                        next_step_data = {**next_step_data, "id": next_step_id}
                 
                 if next_step_data:
+                    # Process the message to replace variables
+                    message = next_step_data.get("message", {})
+                    processed_message = DialogService._replace_variables(message, dialog_state.collected_data)
+                    
                     return {
-                        "message": next_step_data.get("message", {}),
+                        "message": processed_message,
                         "buttons": next_step_data.get("buttons", []),
                         "next_step": next_step_data.get("next_step")
                     }
             
+            # Process the message to replace variables
+            message = {"text": "I'm not sure what to do next."}
+            processed_message = DialogService._replace_variables(message, dialog_state.collected_data)
+            
             return {
-                "message": {"text": "I'm not sure what to do next."},
+                "message": processed_message,
                 "buttons": [],
                 "next_step": None
             }

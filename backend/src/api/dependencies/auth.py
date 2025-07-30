@@ -44,7 +44,7 @@ async def get_current_user_id(
 async def get_current_user(
     user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db),
-) -> dict:
+):
     """
     Get current authenticated user profile.
     
@@ -74,10 +74,12 @@ def check_role(allowed_roles: list[UserRole]):
     Returns:
         function: Dependency function
     """
-    async def _check_role(user: dict = Depends(get_current_user)) -> dict:
-        if user.get("role") not in [role.value for role in allowed_roles]:
+    async def _check_role(user = Depends(get_current_user)):
+        # Handle both UserProfile objects and dictionaries
+        user_role = user.role if hasattr(user, 'role') else user.get('role')
+        if user_role not in [role.value for role in allowed_roles]:
             raise PermissionDeniedError(
-                detail=f"Role {user.get('role')} not authorized for this operation"
+                detail=f"Role {user_role} not authorized for this operation"
             )
         return user
     return _check_role
@@ -96,11 +98,12 @@ def has_account_access(account_id: str = None, restaurant_id: str = None, store_
         function: Dependency function
     """
     async def _has_access(
-        user: dict = Depends(get_current_user),
+        user = Depends(get_current_user),
         db: Session = Depends(get_db),
-    ) -> dict:
+    ):
         # Admin has access to everything
-        if user.get("role") == UserRole.ADMIN.value:
+        user_role = user.role if hasattr(user, 'role') else user.get('role')
+        if user_role == UserRole.ADMIN.value:
             return user
             
         # TODO: Implement access check logic for other roles

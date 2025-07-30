@@ -144,3 +144,4 @@ temp/
 /.next/
 /.nuxt/
 /.output/
+backend/.bot_id_storage

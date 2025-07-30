@@ -130,7 +130,7 @@ class DialogManager:
         })
         
         # Get or initialize the dialog state
-        self.logger.debug(LogEventType.STATE, "Retrieving dialog state")
+        self.logger.debug(LogEventType.STATE_CHANGE, "Retrieving dialog state")
         dialog_state = await self.state_repository.get_dialog_state(
             bot_id=bot_id,
             platform=platform,
@@ -140,12 +140,12 @@ class DialogManager:
         # Update logger with dialog_id if available
         if dialog_state and "id" in dialog_state:
             self.logger.set_context(dialog_id=str(dialog_state["id"]))
-            self.logger.debug(LogEventType.STATE, "Retrieved existing dialog state", {
+            self.logger.debug(LogEventType.STATE_CHANGE, "Retrieved existing dialog state", {
                 "current_step": dialog_state.get("current_step"),
                 "collected_data_keys": list(dialog_state.get("collected_data", {}).keys()) 
             })
         else:
-            self.logger.debug(LogEventType.STATE, "No existing dialog state found")
+            self.logger.debug(LogEventType.STATE_CHANGE, "No existing dialog state found")
         
         # Handle message based on type
         if message_type == "message" and content.get("type") == "text":

@@ -1,4 +1,4 @@
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Union
 from fastapi import APIRouter, Depends, HTTPException, Request, status, Body
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -56,6 +56,7 @@ async def verify_telegram_token(bot_id: UUID, token: str, db: AsyncSession) -> b
 
 
 @router.post("/telegram/{bot_id}")
+@router.get("/telegram/{bot_id}/debug", include_in_schema=True)
 async def telegram_webhook(
     bot_id: UUID,
     request: Request,
@@ -64,7 +65,51 @@ async def telegram_webhook(
     """
     Handle webhook requests from Telegram.
     The request path includes the bot ID to identify which bot should handle the message.
+    
+    For GET requests to /debug endpoint, it returns a simple status message to verify the route is working.
     """
+    # If this is a GET request to the debug endpoint, return a simple status message
+    if request.method == "GET" and request.url.path.endswith("/debug"):
+        logger.info(f"Debug request received for bot {bot_id}")
+        
+        # Check if the bot exists
+        query = select(BotInstance).where(
+            BotInstance.id == bot_id
+        )
+        result = await db.execute(query)
+        bot_instance = result.unique().scalars().first()
+        
+        if not bot_instance:
+            return {"status": "error", "detail": f"Bot not found with ID: {bot_id}"}
+            
+        # Check if bot has Telegram platform credentials
+        query = select(BotPlatformCredential).where(
+            BotPlatformCredential.bot_id == bot_id,
+            BotPlatformCredential.platform == "telegram"
+        )
+        result = await db.execute(query)
+        credential = result.unique().scalars().first()
+        
+        if not credential:
+            return {"status": "error", "detail": "No Telegram credentials found for this bot"}
+            
+        # Return webhook status info
+        webhook_service = WebhookService(db)
+        try:
+            webhook_status = await webhook_service.get_status(bot_id)
+            return {
+                "status": "success",
+                "bot_id": str(bot_id),
+                "webhook_url": webhook_status.url or "Not set",
+                "pending_updates": webhook_status.pending_update_count,
+                "route_path": request.url.path
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "detail": str(e),
+                "route_path": request.url.path
+            }
     # Get the update from Telegram
     try:
         update_data = await request.json()

@@ -95,6 +95,10 @@ SCRATCH*.md
 tmp/
 temp/
 
+# Bot credentials
+telegram_token.txt
+telegram_credentials.json
+
 # Local development files
 *.dev.js
 *.dev.jsx
