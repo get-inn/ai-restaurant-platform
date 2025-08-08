@@ -516,6 +516,15 @@ class DialogService:
                     message = next_step_data.get("message", {})
                     processed_message = DialogService._replace_variables(message, dialog_state.collected_data, scenario.scenario_data)
                     
+                    # Log media content if present
+                    media = processed_message.get("media", [])
+                    if media:
+                        import logging
+                        logger = logging.getLogger("dialog_service")
+                        logger.info(f"Media content found in step '{next_step_id}': {len(media)} items")
+                        for i, media_item in enumerate(media):
+                            logger.info(f"Media item {i+1}: type={media_item.get('type')}, file_id={media_item.get('file_id')}")
+                    
                     return {
                         "message": processed_message,
                         "buttons": next_step_data.get("buttons", []),

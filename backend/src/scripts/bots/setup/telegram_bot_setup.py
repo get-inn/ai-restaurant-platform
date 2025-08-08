@@ -566,7 +566,7 @@ def check_and_set_bot_scenario(bot_id, force_reload=False):
             logger.info("Existing scenarios deactivated. Loading updated scenario.")
             
         # Read the onboarding scenario file
-        scenario_path = ROOT_DIR / "docs" / "archive" / "onboarding_scenario.json"
+        scenario_path = ROOT_DIR / "docs" / "modules" / "bot-management" / "example-scenario" / "onboarding_scenario.json"
         
         if not scenario_path.exists():
             logger.error(f"Scenario file not found at {scenario_path}")

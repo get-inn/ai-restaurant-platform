@@ -1,12 +1,12 @@
-from typing import List, Optional, Dict, BinaryIO
+from typing import List, Optional, Dict, BinaryIO, Tuple
 from uuid import UUID
 import os
-import shutil
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import update, delete
 from fastapi import UploadFile
+import mimetypes
 
 from src.api.models import BotMediaFile, BotInstance
 from src.api.schemas.bots.media_schemas import (
@@ -19,13 +19,45 @@ from src.api.schemas.bots.media_schemas import (
 
 class MediaService:
     @staticmethod
+    async def determine_content_type(file_name: str, file_type: str, content_type: Optional[str] = None) -> str:
+        """Determine the appropriate content type based on file name and type"""
+        if content_type:
+            return content_type
+            
+        # Try to get content type from file extension
+        extension = os.path.splitext(file_name)[1].lower()
+        guessed_type = mimetypes.guess_type(file_name)[0]
+        if guessed_type:
+            return guessed_type
+            
+        # Fall back to basic types based on file_type
+        if file_type == "image":
+            if extension in [".jpg", ".jpeg"]:
+                return "image/jpeg"
+            elif extension == ".png":
+                return "image/png"
+            elif extension == ".gif":
+                return "image/gif"
+            else:
+                return f"image/{extension[1:]}" if extension else "image/unknown"
+        elif file_type == "video":
+            return f"video/{extension[1:]}" if extension else "video/mp4"
+        elif file_type == "audio":
+            return f"audio/{extension[1:]}" if extension else "audio/mpeg"
+        elif file_type == "document" and extension == ".pdf":
+            return "application/pdf"
+            
+        # Default fallback
+        return "application/octet-stream"
+
+    @staticmethod
     async def create_media_file(
         db: AsyncSession, 
         file: UploadFile, 
         bot_id: UUID,
-        storage_dir: str
+        storage_dir: Optional[str] = None  # Parameter kept for backward compatibility
     ) -> Optional[BotMediaFileDB]:
-        """Create a new media file entry and save the file to storage"""
+        """Create a new media file entry and store file content in the database"""
         # Check if the bot exists
         query = select(BotInstance).where(BotInstance.id == bot_id)
         result = await db.execute(query)
@@ -34,35 +66,31 @@ class MediaService:
         if not bot_instance:
             return None
         
-        # Ensure storage directory exists
-        os.makedirs(storage_dir, exist_ok=True)
-        
         # Determine file type from content-type or extension
-        file_type = file.content_type.split('/')[0] if file.content_type else "unknown"
-        
-        # Create a storage path for the file
+        content_type = file.content_type
+        file_type = content_type.split('/')[0] if content_type else "unknown"
         filename = file.filename
-        storage_path = os.path.join(storage_dir, f"{bot_id}_{datetime.now().timestamp()}_{filename}")
         
-        # Save the file
-        with open(storage_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        # Read file content into memory
+        file_content = await file.read()
+        file_size = len(file_content)
+        
+        # Ensure content type is properly set
+        final_content_type = await MediaService.determine_content_type(
+            file_name=filename, 
+            file_type=file_type,
+            content_type=content_type
+        )
         
         # Create database entry
-        media_create = BotMediaFileCreate(
+        db_media_file = BotMediaFile(
             bot_id=bot_id,
             file_type=file_type,
             file_name=filename,
-            storage_path=storage_path,
+            file_content=file_content,
+            content_type=final_content_type,
+            file_size=file_size,
             platform_file_ids={}
-        )
-        
-        db_media_file = BotMediaFile(
-            bot_id=media_create.bot_id,
-            file_type=media_create.file_type,
-            file_name=media_create.file_name,
-            storage_path=media_create.storage_path,
-            platform_file_ids=media_create.platform_file_ids
         )
         
         db.add(db_media_file)
@@ -80,6 +108,56 @@ class MediaService:
         
         if media_file:
             return BotMediaFileDB.model_validate(media_file)
+        return None
+        
+    @staticmethod
+    async def get_media_file_by_platform_id(db: AsyncSession, bot_id: UUID, platform: str, file_id: str) -> Optional[BotMediaFileDB]:
+        """Get media file by platform-specific file ID"""
+        # Construct query to find media files for this bot
+        query = select(BotMediaFile).where(BotMediaFile.bot_id == bot_id)
+        result = await db.execute(query)
+        media_files = result.scalars().all()
+        
+        # Check each file's platform_file_ids dictionary for the requested ID
+        for media_file in media_files:
+            platform_file_ids = media_file.platform_file_ids or {}
+            if platform in platform_file_ids and platform_file_ids[platform] == file_id:
+                return BotMediaFileDB.model_validate(media_file)
+            
+            # If no platform-specific match, check if the file_id matches directly
+            # This handles scenario file_ids like "company_history_image"
+            if file_id in platform_file_ids.values():
+                return BotMediaFileDB.model_validate(media_file)
+        
+        return None
+        
+    @staticmethod
+    async def find_media_file_by_id_or_name(db: AsyncSession, id_or_name: str) -> Optional[BotMediaFileDB]:
+        """Find media file by UUID or by scenario file_id name"""
+        # First, try to interpret as UUID
+        try:
+            media_id = UUID(id_or_name)
+            # Look up by ID
+            query = select(BotMediaFile).where(BotMediaFile.id == media_id)
+            result = await db.execute(query)
+            media_file = result.scalars().first()
+            if media_file:
+                return BotMediaFileDB.model_validate(media_file)
+        except ValueError:
+            # Not a valid UUID, might be a file_id
+            pass
+        
+        # Try to find by platform_file_ids in any bot
+        query = select(BotMediaFile)
+        result = await db.execute(query)
+        media_files = result.scalars().all()
+        
+        for media_file in media_files:
+            platform_file_ids = media_file.platform_file_ids or {}
+            # Check if the ID matches any platform's file_id
+            if id_or_name in platform_file_ids.values():
+                return BotMediaFileDB.model_validate(media_file)
+        
         return None
 
     @staticmethod
@@ -129,7 +207,7 @@ class MediaService:
 
     @staticmethod
     async def delete_media_file(db: AsyncSession, media_id: UUID) -> bool:
-        """Delete a media file and remove it from storage"""
+        """Delete a media file from the database"""
         query = select(BotMediaFile).where(BotMediaFile.id == media_id)
         result = await db.execute(query)
         media_file = result.scalars().first()
@@ -137,11 +215,7 @@ class MediaService:
         if not media_file:
             return False
         
-        # Remove the file from storage if it exists
-        if os.path.exists(media_file.storage_path):
-            os.remove(media_file.storage_path)
-        
-        # Delete database entry
+        # Delete database entry (file content is deleted automatically)
         await db.delete(media_file)
         await db.commit()
         
@@ -170,8 +244,13 @@ class MediaService:
         return [BotMediaFileDB.model_validate(file) for file in media_files]
 
     @staticmethod
-    async def get_file_content(file_path: str) -> Optional[BinaryIO]:
-        """Get file content from storage path"""
-        if os.path.exists(file_path):
-            return open(file_path, "rb")
-        return None
+    async def get_file_content(db: AsyncSession, media_id: UUID) -> Optional[Tuple[bytes, str]]:
+        """Get file content and content type from the database"""
+        query = select(BotMediaFile).where(BotMediaFile.id == media_id)
+        result = await db.execute(query)
+        media_file = result.scalars().first()
+        
+        if not media_file or not media_file.file_content:
+            return None
+        
+        return (media_file.file_content, media_file.content_type)

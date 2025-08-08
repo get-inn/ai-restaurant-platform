@@ -29,7 +29,8 @@ ENVIRONMENT = os.environ.get("ENVIRONMENT", "development")
 LOG_LEVEL = os.environ.get("BOT_LOG_LEVEL", "INFO")
 LOG_FORMAT = os.environ.get("BOT_LOG_FORMAT", "json")  # json or text
 LOG_DIR = os.environ.get("BOT_LOG_DIR", "/app/logs" if os.path.exists("/app") else "logs")
-FILE_LOGGING = os.environ.get("BOT_FILE_LOGGING", "false").lower() == "true"
+# Modified for testing
+FILE_LOGGING = True  # Force file logging regardless of environment variable
 
 # Thread-local storage for context
 _thread_local = threading.local()
@@ -49,6 +50,7 @@ class LogEventType(str, Enum):
     DIALOG = "DIALOG"         # Dialog operations
     SCENARIO = "SCENARIO"     # Scenario operations
     CACHE = "CACHE"           # Cache operations
+    MEDIA = "MEDIA"           # Media content operations
 
 # Ensure log directory exists if file logging is enabled
 if FILE_LOGGING and not os.path.exists(LOG_DIR):
@@ -57,6 +59,9 @@ if FILE_LOGGING and not os.path.exists(LOG_DIR):
 # Set up the root logger
 logger = logging.getLogger("bot.conversation")
 logger.setLevel(getattr(logging, LOG_LEVEL.upper()))
+
+# Force DEBUG level for console to see all logs
+console_log_level = "DEBUG"
 
 # Prevent propagation to root logger to avoid duplicate logs
 logger.propagate = False
@@ -67,7 +72,7 @@ if logger.handlers:
 
 # Create console handler for Docker logging
 console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setLevel(getattr(logging, LOG_LEVEL.upper()))
+console_handler.setLevel(getattr(logging, console_log_level.upper()))
 
 # Create formatters
 if LOG_FORMAT == "json":
@@ -255,6 +260,14 @@ class ConversationLogger:
     def outgoing_message(self, message: str, data: Optional[Dict[str, Any]] = None):
         """Log an outgoing message to a user"""
         self.info(LogEventType.OUTGOING, f"Sent: {message}", data)
+    
+    def media_processing(self, operation: str, media_type: str, data: Optional[Dict[str, Any]] = None):
+        """Log a media processing operation"""
+        combined_data = {"media_type": media_type}
+        if data:
+            combined_data.update(data)
+        # Use info level to ensure it's always visible in logs
+        self.info(LogEventType.MEDIA, f"Media {operation}: {media_type}", combined_data)
     
     def webhook_received(self, platform: str, data: Optional[Dict[str, Any]] = None):
         """Log a webhook event"""

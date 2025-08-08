@@ -109,7 +109,10 @@ class BotMediaFile(Base):
     bot_id = Column(UUID(as_uuid=True), ForeignKey("bot_instance.id"), nullable=False)
     file_type = Column(String, nullable=False)  # 'image', 'video', etc.
     file_name = Column(String, nullable=False)
-    storage_path = Column(String, nullable=False)
+    # Binary file content stored directly in database
+    file_content = Column(LargeBinary, nullable=False)
+    content_type = Column(String, nullable=False)  # MIME type (e.g., 'image/jpeg')
+    file_size = Column(Integer, nullable=False)  # Size in bytes
     platform_file_ids = Column(JSONB, nullable=True)  # Map of platform -> file_id
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())

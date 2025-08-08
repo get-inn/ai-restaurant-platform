@@ -7,7 +7,8 @@ from datetime import datetime
 class BotMediaFileBase(BaseModel):
     file_type: str = Field(..., description="Media file type (image, video, audio, etc.)")
     file_name: str = Field(..., description="Original file name")
-    storage_path: str = Field(..., description="Path where the file is stored")
+    content_type: str = Field(..., description="MIME type of the file")
+    file_size: int = Field(..., description="Size of the file in bytes")
     platform_file_ids: Optional[Dict[str, str]] = Field(default_factory=dict, description="Map of platform->file_id")
 
 
@@ -18,7 +19,8 @@ class BotMediaFileCreate(BotMediaFileBase):
 class BotMediaFileUpdate(BaseModel):
     file_type: Optional[str] = None
     file_name: Optional[str] = None
-    storage_path: Optional[str] = None
+    content_type: Optional[str] = None
+    file_size: Optional[int] = None
     platform_file_ids: Optional[Dict[str, str]] = None
 
 
@@ -36,7 +38,8 @@ class MediaUploadResponse(BaseModel):
     media_id: UUID = Field(..., description="ID of the uploaded media file")
     file_name: str = Field(..., description="Original file name")
     file_type: str = Field(..., description="Media file type")
-    storage_path: str = Field(..., description="Path where the file is stored")
+    content_type: str = Field(..., description="MIME type of the file")
+    file_size: int = Field(..., description="Size of the file in bytes")
 
 
 class PlatformFileIDUpdate(BaseModel):

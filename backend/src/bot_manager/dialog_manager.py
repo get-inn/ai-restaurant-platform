@@ -148,18 +148,52 @@ class DialogManager:
             self.logger.debug(LogEventType.STATE_CHANGE, "No existing dialog state found")
         
         # Handle message based on type
-        if message_type == "message" and content.get("type") == "text":
-            user_input = content.get("text", "")
-            self.logger.incoming_message(user_input, {"message_type": "text"})
+        if message_type == "message":
+            content_type = content.get("type", "")
             
-            response = await self.handle_text_message(
-                bot_id=bot_id,
-                platform=platform,
-                platform_chat_id=platform_chat_id,
-                text=user_input,
-                dialog_state=dialog_state
-            )
-            return response
+            if content_type == "text":
+                # Handle text messages
+                user_input = content.get("text", "")
+                self.logger.incoming_message(user_input, {"message_type": "text"})
+                
+                response = await self.handle_text_message(
+                    bot_id=bot_id,
+                    platform=platform,
+                    platform_chat_id=platform_chat_id,
+                    text=user_input,
+                    dialog_state=dialog_state
+                )
+                return response
+                
+            elif content_type in ["photo", "video", "audio", "document", "voice", "image"]:
+                # Handle media messages
+                file_id = content.get("file_id", "")
+                caption = content.get("caption", "")
+                
+                self.logger.info(LogEventType.MEDIA, f"Received {content_type} media", {
+                    "media_type": content_type,
+                    "file_id": file_id,
+                    "has_caption": bool(caption),
+                    "caption": caption[:100] if caption else ""
+                })
+                
+                # Process media message similar to text messages, using caption as text if available
+                text_to_process = caption if caption else f"[{content_type.upper()}]"
+                self.logger.incoming_message(text_to_process, {
+                    "message_type": "media",
+                    "media_type": content_type,
+                    "file_id": file_id
+                })
+                
+                # Process the media message through the dialog service
+                response = await self.handle_text_message(
+                    bot_id=bot_id,
+                    platform=platform,
+                    platform_chat_id=platform_chat_id,
+                    text=text_to_process,
+                    dialog_state=dialog_state
+                )
+                return response
             
         elif message_type == "callback" and content.get("type") == "button":
             button_value = content.get("value", "")
@@ -248,6 +282,7 @@ class DialogManager:
                     message = response.get("message", {})
                     buttons = response.get("buttons", [])
                     message_text = message.get("text", "")
+                    media = message.get("media", [])
                     
                     if buttons:
                         formatted_buttons = [
@@ -258,8 +293,19 @@ class DialogManager:
                         self.logger.debug(LogEventType.ADAPTER, f"Sending message with {len(buttons)} buttons")
                         self.logger.outgoing_message(message_text, {
                             "buttons": [b.get("text") for b in buttons],
-                            "has_buttons": True
+                            "has_buttons": True,
+                            "has_media": bool(media),
+                            "media_count": len(media) if media else 0
                         })
+                        
+                        # Log media details if present
+                        if media:
+                            for media_item in media:
+                                self.logger.media_processing("sending", media_item.get("type", "unknown"), {
+                                    "file_id": media_item.get("file_id"),
+                                    "description": media_item.get("description"),
+                                    "with_buttons": True
+                                })
                         
                         await adapter.send_buttons(
                             chat_id=platform_chat_id,
@@ -268,7 +314,19 @@ class DialogManager:
                         )
                     else:
                         self.logger.debug(LogEventType.ADAPTER, "Sending text message")
-                        self.logger.outgoing_message(message_text)
+                        self.logger.outgoing_message(message_text, {
+                            "has_media": bool(media),
+                            "media_count": len(media) if media else 0
+                        })
+                        
+                        # Log media details if present
+                        if media:
+                            for media_item in media:
+                                self.logger.media_processing("sending", media_item.get("type", "unknown"), {
+                                    "file_id": media_item.get("file_id"),
+                                    "description": media_item.get("description"),
+                                    "with_buttons": False
+                                })
                         
                         await adapter.send_text_message(
                             chat_id=platform_chat_id,
@@ -406,21 +464,52 @@ class DialogManager:
                 if adapter:
                     message = welcome_step.get("message", {})
                     buttons = welcome_step.get("buttons", [])
+                    media = message.get("media", [])
+                    
+                    # Create a DialogMessage object from the message data
+                    from src.api.schemas.bots.dialog_schemas import DialogMessage, MediaItem
+                    
+                    # Convert any media dictionaries to MediaItem objects
+                    media_items = []
+                    if media:
+                        for item in media:
+                            media_items.append(MediaItem(
+                                type=item.get("type", "unknown"),
+                                file_id=item.get("file_id", ""),
+                                description=item.get("description")
+                            ))
+                    
+                    dialog_message = DialogMessage(
+                        text=message.get("text", ""),
+                        media=media_items
+                    )
+                    
+                    self.logger.info(LogEventType.MEDIA, f"Welcome step has {len(media_items)} media items", {
+                        "media_count": len(media_items),
+                        "media_types": [m.type for m in media_items] if media_items else [],
+                        "media_ids": [m.file_id for m in media_items] if media_items else []
+                    })
                     
                     if buttons:
                         formatted_buttons = [
                             {"text": btn.get("text", ""), "value": btn.get("value", "")}
                             for btn in buttons
                         ]
-                        await adapter.send_buttons(
-                            chat_id=platform_chat_id,
-                            text=message.get("text", ""),
+                        # Use send_message with media and buttons
+                        await self.send_message(
+                            bot_id=bot_id,
+                            platform=platform,
+                            platform_chat_id=platform_chat_id,
+                            message=dialog_message,
                             buttons=formatted_buttons
                         )
                     else:
-                        await adapter.send_text_message(
-                            chat_id=platform_chat_id,
-                            text=message.get("text", "")
+                        # Use send_message with media but no buttons
+                        await self.send_message(
+                            bot_id=bot_id,
+                            platform=platform,
+                            platform_chat_id=platform_chat_id,
+                            message=dialog_message
                         )
                         
                 return {
@@ -501,8 +590,22 @@ class DialogManager:
         if isinstance(message, str):
             message_text = message
             message = DialogMessage(text=message_text)
+            # No media in string messages
+            media = []
         else:
             message_text = message.text
+            # Check for media in the message object
+            media = getattr(message, 'media', [])
+            
+        # Debug log for media content
+        if media:
+            self.logger.info(LogEventType.MEDIA, f"Media content detected in message: {len(media)} items", {
+                "media_count": len(media),
+                "media_types": [getattr(m, 'type', 'unknown') if hasattr(m, 'type') else m.get('type', 'unknown') for m in media],
+                "media_ids": [getattr(m, 'file_id', 'unknown') if hasattr(m, 'file_id') else m.get('file_id', 'unknown') for m in media],
+                "has_buttons": buttons is not None,
+                "platform": platform
+            })
         
         if buttons:
             result = await adapter.send_buttons(
@@ -511,9 +614,175 @@ class DialogManager:
                 buttons=buttons
             )
         else:
-            result = await adapter.send_text_message(
-                chat_id=platform_chat_id,
-                text=message_text
-            )
+            # Check if we need to send media
+            if media:
+                # For simplicity, just send the first media item
+                # In a real implementation, you might want to send multiple media items
+                media_item = media[0]
+                
+                # Handle both Pydantic MediaItem objects and dictionaries
+                if hasattr(media_item, 'type'):  # It's a Pydantic object
+                    media_type = getattr(media_item, 'type', 'image')  # Default to image
+                    file_id = getattr(media_item, 'file_id', None)
+                else:  # It's a dictionary
+                    media_type = media_item.get('type', 'image')  # Default to image
+                    file_id = media_item.get('file_id')
+                
+                self.logger.info(LogEventType.MEDIA, f"Preparing to send {media_type} media with file_id {file_id}", {
+                    "media_type": media_type,
+                    "file_id": file_id,
+                    "chat_id": platform_chat_id,
+                    "media_item": str(media_item),
+                    "media_item_type": type(media_item).__name__,
+                    "all_media_count": len(media),
+                    "message_text": message_text[:100] + "..." if message_text and len(message_text) > 100 else message_text
+                })
+                
+                # Attempt to use API endpoint to retrieve media file
+                try:
+                    # Use API endpoint to retrieve media file
+                    import httpx
+                    import tempfile
+                    import os
+                    
+                    # Construct API URL to get media by file_id
+                    # The endpoint now supports access without authentication for scenario media
+                    api_base_url = os.environ.get("API_BASE_URL", "http://localhost:8000")
+                    media_url = f"{api_base_url}/v1/api/media/{file_id}/content"
+                    
+                    self.logger.info(LogEventType.MEDIA, f"Retrieving media from API: {media_url}", {
+                        "url": media_url,
+                        "platform": platform,
+                        "file_id": file_id,
+                        "media_type": media_type,
+                        "api_base_url": api_base_url
+                    })
+                    
+                    # Fetch the media file
+                    async with httpx.AsyncClient() as client:
+                        response = await client.get(media_url)
+                        
+                        if response.status_code == 200:
+                            # Determine proper file extension based on content type
+                            content_type = response.headers.get("content-type", "")
+                            ext = ".bin"  # Default extension
+                            
+                            if content_type.startswith("image/jpeg"):
+                                ext = ".jpg"
+                            elif content_type.startswith("image/png"):
+                                ext = ".png"
+                            elif content_type.startswith("image/gif"):
+                                ext = ".gif"
+                            elif content_type.startswith("video/"):
+                                ext = ".mp4"
+                            elif content_type.startswith("audio/"):
+                                ext = ".mp3"
+                            elif content_type == "application/pdf":
+                                ext = ".pdf"
+                            
+                            # Save to temporary file with proper extension
+                            with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
+                                tmp.write(response.content)
+                                tmp_path = tmp.name
+                                
+                            self.logger.info(LogEventType.MEDIA, f"Saved media to temporary file with extension {ext}", {
+                                "content_type": content_type,
+                                "extension": ext,
+                                "file_size": len(response.content)
+                            })
+                                
+                            self.logger.info(LogEventType.MEDIA, f"Successfully retrieved media from API", {
+                                "file_id": file_id,
+                                "temp_path": tmp_path,
+                                "content_length": len(response.content),
+                                "content_type": response.headers.get("content-type", "unknown"),
+                                "headers": str(dict(response.headers)),
+                                "status_code": response.status_code,
+                                "media_type": media_type
+                            })
+                            
+                            # Try to determine if the file is actually a supported format
+                            import imghdr
+                            detected_format = imghdr.what(tmp_path)
+                            
+                            self.logger.info(LogEventType.MEDIA, f"Detected image format: {detected_format}", {
+                                "file_path": tmp_path,
+                                "declared_media_type": media_type,
+                                "detected_format": detected_format
+                            })
+                            
+                            # If it's not a recognized image format but we're trying to send as an image,
+                            # fall back to sending as a document
+                            if media_type == "image" and not detected_format:
+                                self.logger.warning(LogEventType.MEDIA, "Unrecognized image format, falling back to document", {
+                                    "original_media_type": media_type,
+                                    "fallback": "document"
+                                })
+                                media_type = "document"
+                            
+                            # Send the media
+                            result = await adapter.send_media_message(
+                                chat_id=platform_chat_id,
+                                media_type=media_type,
+                                file_path=tmp_path,
+                                caption=message_text if message_text else None
+                            )
+                            
+                            # Clean up the temporary file
+                            try:
+                                os.unlink(tmp_path)
+                            except Exception as e:
+                                self.logger.warning(LogEventType.MEDIA, f"Failed to delete temporary file: {e}", 
+                                                   {"path": tmp_path})
+                            
+                            # Check if media sending succeeded
+                            if not result.get("success", False):
+                                self.logger.error(LogEventType.MEDIA, f"Failed to send media: {result.get('error')}", 
+                                                 {"file_id": file_id})
+                                # Fall back to text message
+                                result = await adapter.send_text_message(
+                                    chat_id=platform_chat_id,
+                                    text=message_text
+                                )
+                        else:
+                            self.logger.error(LogEventType.MEDIA, 
+                                           f"Failed to retrieve media file: Status {response.status_code}", 
+                                           {"status": response.status_code, "response": response.text[:200]})
+                            # Fall back to text-only message
+                            result = await adapter.send_text_message(
+                                chat_id=platform_chat_id,
+                                text=message_text
+                            )
+                except Exception as e:
+                    # Log any errors during media sending
+                    self.logger.error(LogEventType.ERROR, 
+                        f"Error sending media: {str(e)}", 
+                        {"error": str(e), "media_type": media_type, "file_id": file_id})
+                    
+                    # Fall back to text message
+                    result = await adapter.send_text_message(
+                        chat_id=platform_chat_id,
+                        text=message_text
+                    )
+            else:
+                # Regular text message
+                result = await adapter.send_text_message(
+                    chat_id=platform_chat_id,
+                    text=message_text
+                )
             
         return result.get("success", False)
+        
+    def _get_file_extension_for_media_type(self, media_type: str) -> str:
+        """Get appropriate file extension for a media type"""
+        media_type = media_type.lower()
+        if media_type == "image":
+            return ".jpg"
+        elif media_type == "video":
+            return ".mp4"
+        elif media_type == "audio":
+            return ".mp3"
+        elif media_type == "document":
+            return ".pdf"
+        else:
+            return ".bin"  # Generic binary extension

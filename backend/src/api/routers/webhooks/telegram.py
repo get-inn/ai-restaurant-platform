@@ -174,7 +174,15 @@ async def telegram_webhook(
     
     # Initialize credentials
     credentials = {"token": token}
-    await telegram_adapter.initialize(credentials)
+    
+    try:
+        # Initialize but don't fail the webhook if there are API connectivity issues
+        initialization_success = await telegram_adapter.initialize(credentials)
+        if not initialization_success:
+            logger.warning(f"Could not fully initialize Telegram adapter for bot {bot_id}, but continuing with webhook processing")
+    except Exception as e:
+        logger.error(f"Exception during Telegram adapter initialization for bot {bot_id}: {str(e)}")
+        # Continue processing anyway - we'll handle errors at the message sending stage
     
     # Extract platform-specific chat ID
     platform_chat_id = None

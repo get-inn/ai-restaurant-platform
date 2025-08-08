@@ -51,9 +51,16 @@ class BotDialogHistoryDB(BotDialogHistoryBase):
         from_attributes = True
 
 
+class MediaItem(BaseModel):
+    type: str = Field(..., description="Type of media (image, video, audio, document)")
+    file_id: str = Field(..., description="ID or reference to the media file")
+    description: Optional[str] = Field(None, description="Optional description of the media")
+
+
 class DialogMessage(BaseModel):
     text: str = Field(..., description="Message text")
-    media_ids: Optional[List[UUID]] = Field(default_factory=list, description="IDs of media files to include")
+    media: Optional[List[MediaItem]] = Field(default_factory=list, description="Media items to include in the message")
+    media_ids: Optional[List[UUID]] = Field(default_factory=list, description="Legacy IDs of media files to include")
 
 
 class DialogButtonOption(BaseModel):

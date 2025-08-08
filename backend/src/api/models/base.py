@@ -3,7 +3,7 @@ Base module for all models, providing common imports and utilities.
 """
 import uuid
 import enum
-from sqlalchemy import Column, String, DateTime, ForeignKey, Float, Boolean, Date, Time, Integer, Numeric, Text, JSON, Enum, UniqueConstraint
+from sqlalchemy import Column, String, DateTime, ForeignKey, Float, Boolean, Date, Time, Integer, Numeric, Text, JSON, Enum, UniqueConstraint, LargeBinary
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship

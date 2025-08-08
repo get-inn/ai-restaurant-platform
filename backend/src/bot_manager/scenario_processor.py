@@ -82,7 +82,11 @@ class ScenarioProcessor:
         # Process the step based on its type
         step_type = current_step.get("type", "message")
         
-        self.logger.debug(LogEventType.SCENARIO, f"Processing step '{current_step_id}' of type '{step_type}'")
+        self.logger.debug(LogEventType.SCENARIO, f"Processing step '{current_step_id}' of type '{step_type}'", {
+            "step_id": current_step_id,
+            "step_type": step_type,
+            "has_media": "media" in current_step.get("message", {})
+        })
         
         if step_type == "message":
             # Process a simple message step
@@ -95,10 +99,20 @@ class ScenarioProcessor:
             self.logger.debug(LogEventType.SCENARIO, f"Generated message text: '{message_text[:50]}...'" if len(message_text) > 50 else f"Generated message text: '{message_text}'")
             
             # Add processed message to result
+            media = message.get("media", [])
             result["message"] = {
                 "text": message_text,
-                "media": message.get("media", [])
+                "media": media
             }
+            
+            # Log media details if present
+            if media:
+                self.logger.debug(LogEventType.SCENARIO, f"Message contains {len(media)} media items", {
+                    "media_count": len(media),
+                    "media_types": [item.get("type") for item in media],
+                    "media_ids": [item.get("file_id") for item in media],
+                    "step_id": current_step_id
+                })
             
             # Add buttons if present
             if "buttons" in current_step:
@@ -129,10 +143,21 @@ class ScenarioProcessor:
                     message_text = self._substitute_variables(message_text, collected_data, scenario_data)
                     
                     # Add processed message to result
+                    media = message.get("media", [])
                     result["message"] = {
                         "text": message_text,
-                        "media": message.get("media", [])
+                        "media": media
                     }
+                    
+                    # Log media details if present
+                    if media:
+                        self.logger.debug(LogEventType.SCENARIO, f"Conditional message contains {len(media)} media items", {
+                            "media_count": len(media),
+                            "media_types": [item.get("type") for item in media],
+                            "media_ids": [item.get("file_id") for item in media],
+                            "step_id": current_step_id,
+                            "condition_matched": condition.get("if", "")
+                        })
                     break
             
             # Add buttons if present in the step (not the condition)
