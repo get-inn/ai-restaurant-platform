@@ -2,6 +2,7 @@ from typing import Dict, Any, List, Optional
 import httpx
 import json
 import os
+import asyncio
 from datetime import datetime
 from uuid import UUID
 
@@ -19,6 +20,26 @@ class TelegramAdapter(PlatformAdapter):
         self.token = None
         self.bot_info = None
     
+    def _get_logger_context(self):
+        """Get stored context for logging"""
+        context = {}
+        # Extract context from instance variables
+        for key in dir(self):
+            if key.startswith("_context_"):
+                context_key = key[9:]  # Remove '_context_' prefix
+                context[context_key] = getattr(self, key)
+        
+        # Also check if there's any thread-local context from conversation_logger
+        try:
+            from src.bot_manager.conversation_logger import _thread_local
+            if hasattr(_thread_local, 'context'):
+                # Include any relevant thread-local context
+                context.update(_thread_local.context)
+        except ImportError:
+            pass
+            
+        return context
+    
     @property
     def platform_name(self) -> str:
         return "telegram"
@@ -26,7 +47,14 @@ class TelegramAdapter(PlatformAdapter):
     async def initialize(self, credentials: Dict[str, Any]) -> bool:
         """Initialize the adapter with Telegram bot token"""
         from src.bot_manager.conversation_logger import get_logger, LogEventType
-        logger = get_logger(platform="telegram")
+        
+        # Get context for logging
+        context = self._get_logger_context()
+        
+        # Create logger with clean context
+        # Remove any legacy skip flags and platform key if present to avoid duplicates
+        context = {k: v for k, v in context.items() if not k.startswith('skip_') and k != 'platform'}
+        logger = get_logger(platform="telegram", **context)
         
         if "token" not in credentials:
             logger.error(LogEventType.ERROR, "No token provided in credentials")
@@ -75,11 +103,27 @@ class TelegramAdapter(PlatformAdapter):
     async def send_text_message(self, chat_id: str, text: str) -> Dict[str, Any]:
         """Send a text message to a Telegram chat"""
         from src.bot_manager.conversation_logger import get_logger, LogEventType
-        logger = get_logger(platform="telegram")
+        
+        # Get context for logging
+        context = self._get_logger_context()
+        
+        # Create logger with clean context
+        # Remove any legacy skip flags and platform key if present to avoid duplicates
+        context = {k: v for k, v in context.items() if not k.startswith('skip_') and k != 'platform'}
+        logger = get_logger(platform="telegram", **context)
         
         if not self.token:
             logger.error(LogEventType.ERROR, "Cannot send text message: Adapter not initialized")
             return {"success": False, "error": "Adapter not initialized"}
+            
+        # Process message sending
+            
+        # Log all outgoing messages
+        logger.info(LogEventType.OUTGOING, f"Sent: {text}", {
+            "chat_id": chat_id,
+            "has_buttons": False,
+            "text_length": len(text)
+        })
         
         try:
             # Configure httpx with increased timeout and retry settings
@@ -89,14 +133,37 @@ class TelegramAdapter(PlatformAdapter):
                     "chat_id": chat_id
                 })
                 
-                response = await client.post(
-                    f"{self.api_url}{self.token}/sendMessage",
-                    json={
-                        "chat_id": chat_id,
-                        "text": text,
-                        "parse_mode": "HTML"  # Support HTML formatting
-                    }
-                )
+                # Implement automatic retry for network issues
+                max_retries = 2
+                retry_delay = 1.0
+                
+                for retry in range(max_retries + 1):
+                    try:
+                        response = await client.post(
+                            f"{self.api_url}{self.token}/sendMessage",
+                            json={
+                                "chat_id": chat_id,
+                                "text": text,
+                                "parse_mode": "HTML"  # Support HTML formatting
+                            }
+                        )
+                        
+                        # If we got here, the request succeeded
+                        break
+                    except httpx.ConnectTimeout:
+                        if retry < max_retries:
+                            # Log the retry attempt
+                            logger.warning(LogEventType.ADAPTER, f"Connection timeout, retrying ({retry+1}/{max_retries})", {
+                                "chat_id": chat_id,
+                                "retry_count": retry + 1,
+                                "max_retries": max_retries,
+                                "retry_delay": retry_delay
+                            })
+                            # Wait before retrying
+                            await asyncio.sleep(retry_delay)
+                        else:
+                            # We've exhausted our retries, re-raise the exception
+                            raise
                 
                 if response.status_code != 200:
                     error_msg = response.text
@@ -114,11 +181,13 @@ class TelegramAdapter(PlatformAdapter):
                 return {"success": True, "result": result}
                 
         except httpx.ConnectTimeout:
-            logger.error(LogEventType.ERROR, "Connection timeout while sending text message to Telegram API", {
+            logger.error(LogEventType.ERROR, "Connection timeout while sending text message to Telegram API after retries", {
                 "chat_id": chat_id,
-                "text_length": len(text)
+                "text_length": len(text),
+                "max_retries": max_retries
             })
-            return {"success": False, "error": "Connection timeout"}
+            # Return a status that allows the conversation to continue
+            return {"success": False, "error": "Connection timeout", "retry_recommended": True}
             
         except Exception as e:
             logger.error(LogEventType.ERROR, f"Error sending text message: {str(e)}", {
@@ -136,8 +205,13 @@ class TelegramAdapter(PlatformAdapter):
     ) -> Dict[str, Any]:
         """Send a media message to a Telegram chat"""
         from src.bot_manager.conversation_logger import get_logger, LogEventType
-        # Use self.logger to maintain proper context
-        logger = get_logger(platform="telegram")
+        # Get context for logging
+        context = self._get_logger_context()
+        
+        # Create logger with clean context
+        # Remove any legacy skip flags and platform key if present to avoid duplicates
+        context = {k: v for k, v in context.items() if not k.startswith('skip_') and k != 'platform'}
+        logger = get_logger(platform="telegram", **context)
         
         logger.debug(LogEventType.ADAPTER, f"Sending media message of type '{media_type}'", {
             "chat_id": chat_id,
@@ -312,7 +386,18 @@ class TelegramAdapter(PlatformAdapter):
         buttons: List[Dict[str, str]]
     ) -> Dict[str, Any]:
         """Send a message with inline keyboard buttons to a Telegram chat"""
+        from src.bot_manager.conversation_logger import get_logger, LogEventType
+        
+        # Get context for logging
+        context = self._get_logger_context()
+        
+        # Create logger with clean context
+        # Remove any legacy skip flags and platform key if present to avoid duplicates
+        context = {k: v for k, v in context.items() if not k.startswith('skip_') and k != 'platform'}
+        logger = get_logger(platform="telegram", **context)
+        
         if not self.token:
+            logger.error(LogEventType.ERROR, "Cannot send buttons: Adapter not initialized")
             return {"success": False, "error": "Adapter not initialized"}
         
         # Transform our generic button format to Telegram's inline keyboard format
@@ -327,23 +412,81 @@ class TelegramAdapter(PlatformAdapter):
                 })
             keyboard.append(row)
         
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{self.api_url}{self.token}/sendMessage",
-                json={
+        # Log all outgoing messages
+        logger.info(LogEventType.OUTGOING, f"Sent: {text}", {
+            "has_buttons": True, 
+            "buttons": [btn.get("text", "Button") for btn in buttons], 
+            "chat_id": chat_id
+        })
+        
+        try:
+            # Use a timeout of 30 seconds and configure retries
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                logger.debug(LogEventType.ADAPTER, f"Sending buttons message to Telegram API", {
                     "chat_id": chat_id,
-                    "text": text,
-                    "parse_mode": "HTML",
-                    "reply_markup": {
-                        "inline_keyboard": keyboard
-                    }
-                }
-            )
+                    "button_count": len(buttons),
+                    "text_length": len(text)
+                })
+                
+                # Implement automatic retry for network issues
+                max_retries = 2
+                retry_delay = 1.0
+                
+                for retry in range(max_retries + 1):
+                    try:
+                        response = await client.post(
+                            f"{self.api_url}{self.token}/sendMessage",
+                            json={
+                                "chat_id": chat_id,
+                                "text": text,
+                                "parse_mode": "HTML",
+                                "reply_markup": {
+                                    "inline_keyboard": keyboard
+                                }
+                            }
+                        )
+                        
+                        # If we got here, the request succeeded
+                        break
+                    except httpx.ConnectTimeout:
+                        if retry < max_retries:
+                            # Log the retry attempt
+                            logger.warning(LogEventType.ADAPTER, f"Connection timeout, retrying ({retry+1}/{max_retries})", {
+                                "chat_id": chat_id,
+                                "retry_count": retry + 1,
+                                "max_retries": max_retries,
+                                "retry_delay": retry_delay
+                            })
+                            # Wait before retrying
+                            await asyncio.sleep(retry_delay)
+                        else:
+                            # We've exhausted our retries, re-raise the exception
+                            raise
+        except httpx.ConnectTimeout:
+            logger.error(LogEventType.ERROR, "Connection timeout while sending buttons to Telegram API after retries", {
+                "chat_id": chat_id,
+                "text_length": len(text),
+                "button_count": len(buttons),
+                "timeout": "30 seconds",
+                "max_retries": max_retries
+            })
+            # Return partial success to allow the conversation to continue
+            return {"success": False, "error": "Connection timeout", "retry_recommended": True}
+        except Exception as e:
+            logger.error(LogEventType.ERROR, f"Error sending buttons message: {str(e)}", {
+                "exception": str(e),
+                "chat_id": chat_id
+            })
+            return {"success": False, "error": f"Exception: {str(e)}"}
             
-            if response.status_code != 200:
-                return {"success": False, "error": response.text}
-            
-            return {"success": True, "result": response.json().get("result")}
+        if response.status_code != 200:
+            logger.error(LogEventType.ERROR, f"Failed to send buttons message: {response.status_code}", {
+                "status_code": response.status_code,
+                "error": response.text[:200] if len(response.text) > 200 else response.text
+            })
+            return {"success": False, "error": response.text}
+        
+        return {"success": True, "result": response.json().get("result")}
     
     async def set_webhook(self, webhook_url: str) -> bool:
         """Set the webhook URL for receiving Telegram updates"""
@@ -394,7 +537,14 @@ class TelegramAdapter(PlatformAdapter):
         Process a Telegram update and transform it to a unified format
         """
         from src.bot_manager.conversation_logger import get_logger, LogEventType
-        logger = get_logger(platform="telegram")
+        
+        # Get context for logging
+        context = self._get_logger_context()
+        
+        # Create logger with clean context
+        # Remove any legacy skip flags and platform key if present to avoid duplicates
+        context = {k: v for k, v in context.items() if not k.startswith('skip_') and k != 'platform'}
+        logger = get_logger(platform="telegram", **context)
         
         # Extract message or callback query
         message = update_data.get("message")

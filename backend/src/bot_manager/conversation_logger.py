@@ -51,6 +51,7 @@ class LogEventType(str, Enum):
     SCENARIO = "SCENARIO"     # Scenario operations
     CACHE = "CACHE"           # Cache operations
     MEDIA = "MEDIA"           # Media content operations
+    AUTO_TRANSITION = "AUTO_TRANSITION"  # Auto-transition events
 
 # Ensure log directory exists if file logging is enabled
 if FILE_LOGGING and not os.path.exists(LOG_DIR):
@@ -306,6 +307,28 @@ class ConversationLogger:
     def adapter_operation(self, platform: str, operation: str, data: Optional[Dict[str, Any]] = None):
         """Log a platform adapter operation"""
         self.debug(LogEventType.ADAPTER, f"{platform} adapter: {operation}", data)
+    
+    def auto_transition(self, message: str, data: Optional[Dict[str, Any]] = None):
+        """Log an auto-transition event"""
+        self.info(LogEventType.AUTO_TRANSITION, message, data)
+        
+    def auto_transition_message(self, message: str, data: Optional[Dict[str, Any]] = None):
+        """Log an outgoing message from auto-transition"""
+        outgoing_data = {"auto_transition": True}
+        if data:
+            outgoing_data.update(data)
+            
+        # Process auto-transition message with proper logging
+        
+        # Add special marker for critical auto-transition messages
+        if data and data.get("step_type") == "conditional_message":
+            # Make these logs more noticeable for debugging
+            self.info(LogEventType.AUTO_TRANSITION, f"!!! CONDITIONAL MESSAGE SENT IN AUTO-TRANSITION: step_id={data.get('step_id')}, citizenship={data.get('citizenship_value')}", outgoing_data)
+            
+        # Regular auto-transition logging
+        self.info(LogEventType.OUTGOING, f"Auto-transition sent: {message}", outgoing_data)
+        
+        # Context handling is managed by the dialog manager
 
 
 # Create a global instance of the logger

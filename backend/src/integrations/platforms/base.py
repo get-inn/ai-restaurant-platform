@@ -9,6 +9,18 @@ class PlatformAdapter(ABC):
     Each specific platform (Telegram, WhatsApp, etc.) should implement this interface.
     """
     
+    def set_context(self, **kwargs):
+        """
+        Set context information for logging
+        
+        Args:
+            **kwargs: Context key-value pairs like bot_id, dialog_id, etc.
+        """
+        # Store context in instance variables for logging
+        for key, value in kwargs.items():
+            if value is not None:
+                setattr(self, f"_context_{key}", value)
+    
     @property
     @abstractmethod
     def platform_name(self) -> str:

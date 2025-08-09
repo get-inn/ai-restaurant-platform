@@ -320,6 +320,10 @@ class DialogService:
         """
         Process user input and advance the dialog based on the scenario
         Returns the next response to send to the user
+        
+        Special inputs:
+        - @AUTO_TRANSITION@ - Auto transition with normal message sending
+        - @AUTO_TRANSITION_NO_MESSAGE@ - Auto transition with state updates only, no message sending
         """
         # First, get or create dialog state
         dialog_state = await DialogService.get_dialog_state(db, bot_id, platform, platform_chat_id)
@@ -407,10 +411,16 @@ class DialogService:
             message = step_data.get("message", {})
             processed_message = DialogService._replace_variables(message, {}, scenario.scenario_data)
             
+            # Get auto_next properties from the step
+            auto_next = step_data.get("auto_next", False)
+            auto_next_delay = step_data.get("auto_next_delay", 1.5)
+            
             return {
                 "message": processed_message,
                 "buttons": step_data.get("buttons", []),
-                "next_step": step_data.get("next_step")
+                "next_step": step_data.get("next_step"),
+                "auto_next": auto_next,
+                "auto_next_delay": auto_next_delay
             }
         else:
             # Existing dialog, process based on current state
@@ -525,10 +535,16 @@ class DialogService:
                         for i, media_item in enumerate(media):
                             logger.info(f"Media item {i+1}: type={media_item.get('type')}, file_id={media_item.get('file_id')}")
                     
+                    # Get auto_next properties from the step
+                    auto_next = next_step_data.get("auto_next", False)
+                    auto_next_delay = next_step_data.get("auto_next_delay", 1.5)
+                    
                     return {
                         "message": processed_message,
                         "buttons": next_step_data.get("buttons", []),
-                        "next_step": next_step_data.get("next_step")
+                        "next_step": next_step_data.get("next_step"),
+                        "auto_next": auto_next,
+                        "auto_next_delay": auto_next_delay
                     }
             
             # Process the message to replace variables
@@ -538,5 +554,7 @@ class DialogService:
             return {
                 "message": processed_message,
                 "buttons": [],
-                "next_step": None
+                "next_step": None,
+                "auto_next": False,
+                "auto_next_delay": 1.5
             }

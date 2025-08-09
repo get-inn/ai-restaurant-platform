@@ -60,7 +60,10 @@ class ScenarioProcessor:
             "buttons": None,
             "expected_input": None,
             "next_step_id": None,
-            "error": None
+            "error": None,
+            "auto_next": False,
+            "auto_next_delay": 1.5,
+            "current_step_type": None  # Add step type to result for better logging
         }
         
         # Find the current step
@@ -82,10 +85,18 @@ class ScenarioProcessor:
         # Process the step based on its type
         step_type = current_step.get("type", "message")
         
+        # Extract auto_next properties
+        auto_next = current_step.get("auto_next", False)
+        auto_next_delay = current_step.get("auto_next_delay", 1.5)
+        
+        # Store step type in result for better logging and processing
+        result["current_step_type"] = step_type
+        
         self.logger.debug(LogEventType.SCENARIO, f"Processing step '{current_step_id}' of type '{step_type}'", {
             "step_id": current_step_id,
             "step_type": step_type,
-            "has_media": "media" in current_step.get("message", {})
+            "has_media": "media" in current_step.get("message", {}),
+            "auto_next": auto_next
         })
         
         if step_type == "message":
@@ -127,15 +138,52 @@ class ScenarioProcessor:
             result["next_step_id"] = next_step_id
             
             if next_step_id:
-                self.logger.debug(LogEventType.SCENARIO, f"Next step resolved to: '{next_step_id}'")
+                self.logger.debug(LogEventType.SCENARIO, f"Next step resolved to: '{next_step_id}'", {
+                    "current_step_id": current_step_id,
+                    "next_step_id": next_step_id,
+                    "has_conditions": isinstance(current_step.get("next_step", {}), dict) and 
+                                     current_step.get("next_step", {}).get("type") == "conditional"
+                })
             else:
                 self.logger.debug(LogEventType.SCENARIO, "No next step resolved (conversation may end)")
             
         elif step_type == "conditional_message":
             # Process a conditional message step
             conditions = current_step.get("conditions", [])
-            for condition in conditions:
-                if self._evaluate_condition(condition.get("if", ""), collected_data):
+            condition_matched = False
+            
+            self.logger.debug(LogEventType.CONDITION, 
+                             f"Evaluating {len(conditions)} conditions in step '{current_step_id}'", 
+                             {"step_id": current_step_id, "condition_count": len(conditions)})
+                             
+            for i, condition in enumerate(conditions):
+                condition_expr = condition.get("if", "")
+                # Evaluate the condition and log the result
+                condition_result = self._evaluate_condition(condition_expr, collected_data)
+                
+                # Use the dedicated condition_evaluation method for detailed logging
+                self.logger.condition_evaluation(condition_expr, condition_result, {
+                    "step_id": current_step_id,
+                    "step_type": step_type,
+                    "condition_index": i + 1,
+                    "total_conditions": len(conditions)
+                })
+                
+                if condition_result:
+                    condition_matched = True
+                    self.logger.debug(LogEventType.CONDITION, 
+                                     f"Condition '{condition_expr}' matched in step '{current_step_id}'", 
+                                     {"step_id": current_step_id, "condition": condition_expr})
+                                     
+                    # Add enhanced logging for conditional message matches with prominent markers
+                    self.logger.info(LogEventType.CONDITION, 
+                                     f"!!! CONDITIONAL_MATCH !!! - Using content for condition '{condition_expr}' in step '{current_step_id}'", 
+                                     {"step_id": current_step_id,
+                                      "condition_expr": condition_expr,
+                                      "debug_marker": "!!CONDITIONAL_CONTENT_SELECTED!!",
+                                      "matched_condition_index": i + 1,
+                                      "total_conditions": len(conditions)})
+                    
                     message = condition.get("message", {})
                     message_text = message.get("text", "")
                     
@@ -156,9 +204,15 @@ class ScenarioProcessor:
                             "media_types": [item.get("type") for item in media],
                             "media_ids": [item.get("file_id") for item in media],
                             "step_id": current_step_id,
-                            "condition_matched": condition.get("if", "")
+                            "condition_matched": condition_expr
                         })
                     break
+                    
+            # Log if no conditions matched
+            if not condition_matched:
+                self.logger.debug(LogEventType.CONDITION, 
+                                 f"No conditions matched in conditional message step '{current_step_id}'", 
+                                 {"step_id": current_step_id})
             
             # Add buttons if present in the step (not the condition)
             if "buttons" in current_step:
@@ -173,7 +227,12 @@ class ScenarioProcessor:
             result["next_step_id"] = next_step_id
             
             if next_step_id:
-                self.logger.debug(LogEventType.SCENARIO, f"Next step resolved to: '{next_step_id}'")
+                self.logger.debug(LogEventType.SCENARIO, f"Next step resolved to: '{next_step_id}'", {
+                    "current_step_id": current_step_id,
+                    "next_step_id": next_step_id,
+                    "has_conditions": isinstance(current_step.get("next_step", {}), dict) and 
+                                     current_step.get("next_step", {}).get("type") == "conditional"
+                })
             else:
                 self.logger.debug(LogEventType.SCENARIO, "No next step resolved (conversation may end)")
         
@@ -186,6 +245,10 @@ class ScenarioProcessor:
             error_msg = f"Unsupported step type: {step_type}"
             result["error"] = error_msg
             self.logger.error(LogEventType.ERROR, error_msg)
+        
+        # Add auto_next properties to result
+        result["auto_next"] = auto_next
+        result["auto_next_delay"] = auto_next_delay
         
         return result
     
@@ -439,6 +502,15 @@ class ScenarioProcessor:
                              f"Custom condition '{condition_expr}' evaluated to {result}")
             return result
             
+        # Extract variable names from condition for better debugging
+        variable_names = self._extract_variables_from_condition(condition_expr)
+        variable_values = {var: collected_data.get(var, "UNDEFINED") for var in variable_names}
+        
+        if variable_values:
+            self.logger.debug(LogEventType.CONDITION, 
+                             f"Condition variables for '{condition_expr}'", 
+                             {"condition": condition_expr, "variables": variable_values})
+            
         # Handle basic equality comparison (var == value)
         if "==" in condition_expr:
             left, right = condition_expr.split("==", 1)
@@ -452,6 +524,14 @@ class ScenarioProcessor:
                 
             # Get the actual value from collected data
             left_value = collected_data.get(left)
+            
+            # Log the actual comparison values
+            self.logger.condition_evaluation(f"{left} == {right}", str(left_value) == right, {
+                "left_var": left,
+                "left_value": left_value,
+                "right_value": right,
+                "comparison": "equality"
+            })
             
             # Compare and return result
             return str(left_value) == right
@@ -470,6 +550,14 @@ class ScenarioProcessor:
             # Get the actual value from collected data
             left_value = collected_data.get(left)
             
+            # Log the actual comparison values
+            self.logger.condition_evaluation(f"{left} != {right}", str(left_value) != right, {
+                "left_var": left,
+                "left_value": left_value,
+                "right_value": right,
+                "comparison": "inequality"
+            })
+            
             # Compare and return result
             return str(left_value) != right
             
@@ -483,8 +571,24 @@ class ScenarioProcessor:
                 # Convert to numbers for comparison
                 left_value = float(collected_data.get(left, 0))
                 right_value = float(right)
-                return left_value > right_value
+                
+                # Log the actual comparison values
+                result = left_value > right_value
+                self.logger.condition_evaluation(f"{left} > {right}", result, {
+                    "left_var": left,
+                    "left_value": left_value,
+                    "right_value": right_value,
+                    "comparison": "greater_than"
+                })
+                
+                return result
             except (ValueError, TypeError):
+                self.logger.condition_evaluation(f"{left} > {right}", False, {
+                    "error": "Invalid numeric comparison",
+                    "left_var": left,
+                    "left_value": collected_data.get(left),
+                    "right_value": right
+                })
                 return False
                 
         # Handle less than comparison (var < value)
@@ -497,8 +601,24 @@ class ScenarioProcessor:
                 # Convert to numbers for comparison
                 left_value = float(collected_data.get(left, 0))
                 right_value = float(right)
-                return left_value < right_value
+                
+                # Log the actual comparison values
+                result = left_value < right_value
+                self.logger.condition_evaluation(f"{left} < {right}", result, {
+                    "left_var": left,
+                    "left_value": left_value,
+                    "right_value": right_value,
+                    "comparison": "less_than"
+                })
+                
+                return result
             except (ValueError, TypeError):
+                self.logger.condition_evaluation(f"{left} < {right}", False, {
+                    "error": "Invalid numeric comparison",
+                    "left_var": left,
+                    "left_value": collected_data.get(left),
+                    "right_value": right
+                })
                 return False
                 
         # Handle contains check (var contains value)
@@ -515,12 +635,78 @@ class ScenarioProcessor:
             # Get the actual value from collected data
             left_value = str(collected_data.get(left, ""))
             
-            return right in left_value
+            # Log the actual comparison values
+            result = right in left_value
+            self.logger.condition_evaluation(f"{left} contains {right}", result, {
+                "left_var": left,
+                "left_value": left_value,
+                "right_value": right,
+                "comparison": "contains"
+            })
+            
+            return result
             
         # Handle exists check (var exists)
         elif "exists" in condition_expr:
             var_name = condition_expr.split("exists", 1)[0].strip()
-            return var_name in collected_data
+            result = var_name in collected_data
             
-        logger.warning(f"Unsupported condition: {condition_expr}")
+            # Log the existence check
+            self.logger.condition_evaluation(f"{var_name} exists", result, {
+                "variable": var_name,
+                "exists": result,
+                "comparison": "exists"
+            })
+            
+            return result
+            
+        self.logger.warning(LogEventType.CONDITION, f"Unsupported condition: {condition_expr}")
         return False
+        
+    def _extract_variables_from_condition(
+        self,
+        condition_expr: str
+    ) -> List[str]:
+        """
+        Extract variable names from a condition expression.
+        
+        Args:
+            condition_expr: The condition expression to analyze
+            
+        Returns:
+            List of variable names found in the condition
+        """
+        variables = []
+        
+        # Handle different condition types
+        if "==" in condition_expr:
+            left = condition_expr.split("==", 1)[0].strip()
+            if left and left not in variables:
+                variables.append(left)
+                
+        elif "!=" in condition_expr:
+            left = condition_expr.split("!=", 1)[0].strip()
+            if left and left not in variables:
+                variables.append(left)
+                
+        elif ">" in condition_expr:
+            left = condition_expr.split(">", 1)[0].strip()
+            if left and left not in variables:
+                variables.append(left)
+                
+        elif "<" in condition_expr:
+            left = condition_expr.split("<", 1)[0].strip()
+            if left and left not in variables:
+                variables.append(left)
+                
+        elif "contains" in condition_expr:
+            left = condition_expr.split("contains", 1)[0].strip()
+            if left and left not in variables:
+                variables.append(left)
+                
+        elif "exists" in condition_expr:
+            var_name = condition_expr.split("exists", 1)[0].strip()
+            if var_name and var_name not in variables:
+                variables.append(var_name)
+                
+        return variables
