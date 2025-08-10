@@ -108,3 +108,7 @@ telegram_credentials.json
 *.local.jsx
 *.local.ts
 *.local.tsx
+
+# Docs
+docs/modules/bot-management/chiho
+docs/archive

@@ -56,6 +56,50 @@ class PlatformAdapter(ABC):
         Returns platform-specific response data
         """
         pass
+        
+    @abstractmethod
+    async def send_media_with_buttons(
+        self, 
+        chat_id: str, 
+        media_type: str, 
+        file_path: str, 
+        caption: Optional[str] = None,
+        buttons: Optional[List[Dict[str, str]]] = None
+    ) -> Dict[str, Any]:
+        """
+        Send a media message with buttons attached
+        
+        Args:
+            chat_id: Chat ID in the platform
+            media_type: Type of media (image, video, audio, document)
+            file_path: Path to the media file
+            caption: Optional caption text for the media
+            buttons: Optional list of buttons to attach to the media
+            
+        Returns:
+            Platform-specific response data
+        """
+        pass
+        
+    @abstractmethod
+    async def send_media_group(
+        self,
+        chat_id: str,
+        media_items: List[Dict[str, Any]],
+        caption: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Send multiple media items as a group
+        
+        Args:
+            chat_id: Chat ID in the platform
+            media_items: List of media items to send
+            caption: Optional caption text for the media group (may only apply to first item)
+            
+        Returns:
+            Platform-specific response data
+        """
+        pass
     
     @abstractmethod
     async def send_buttons(

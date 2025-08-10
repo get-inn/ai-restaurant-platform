@@ -52,6 +52,12 @@ class LogEventType(str, Enum):
     CACHE = "CACHE"           # Cache operations
     MEDIA = "MEDIA"           # Media content operations
     AUTO_TRANSITION = "AUTO_TRANSITION"  # Auto-transition events
+    MEDIA_SCENARIO = "MEDIA_SCENARIO"    # Media in scenario
+    MEDIA_TELEGRAM = "MEDIA_TELEGRAM"    # Telegram media operations
+    MEDIA_REFERENCE = "MEDIA_REFERENCE"  # Media reference resolution
+    MEDIA_FORMAT = "MEDIA_FORMAT"        # Media format detection
+    MEDIA_VALIDATION = "MEDIA_VALIDATION" # Media validation
+    MEDIA_ERROR = "MEDIA_ERROR"           # Media errors
 
 # Ensure log directory exists if file logging is enabled
 if FILE_LOGGING and not os.path.exists(LOG_DIR):
@@ -263,12 +269,131 @@ class ConversationLogger:
         self.info(LogEventType.OUTGOING, f"Sent: {message}", data)
     
     def media_processing(self, operation: str, media_type: str, data: Optional[Dict[str, Any]] = None):
-        """Log a media processing operation"""
+        """
+        Log a media processing operation with detailed information.
+        
+        Args:
+            operation: The operation being performed (upload, download, send, etc.)
+            media_type: Type of media (image, video, audio, document)
+            data: Additional data about the media and operation
+        """
         combined_data = {"media_type": media_type}
         if data:
             combined_data.update(data)
-        # Use info level to ensure it's always visible in logs
+        
+        # Use INFO level for all media operations to ensure visibility
         self.info(LogEventType.MEDIA, f"Media {operation}: {media_type}", combined_data)
+    
+    def media_scenario(self, step_id: str, media_count: int, data: Optional[Dict[str, Any]] = None):
+        """
+        Log media usage in a scenario step.
+        
+        Args:
+            step_id: The scenario step ID
+            media_count: Number of media items in the step
+            data: Additional data about the media items
+        """
+        combined_data = {"step_id": step_id, "media_count": media_count}
+        if data:
+            combined_data.update(data)
+            
+        self.info(LogEventType.MEDIA_SCENARIO, f"{step_id} step has {media_count} media items", combined_data)
+    
+    def media_reference(self, file_id: str, resolved: bool, data: Optional[Dict[str, Any]] = None):
+        """
+        Log media reference resolution status.
+        
+        Args:
+            file_id: The file ID being resolved
+            resolved: Whether the reference was successfully resolved
+            data: Additional data about the resolution process
+        """
+        combined_data = {"file_id": file_id, "resolved": resolved}
+        if data:
+            combined_data.update(data)
+            
+        if resolved:
+            self.info(LogEventType.MEDIA_REFERENCE, f"Resolved media reference: {file_id}", combined_data)
+        else:
+            self.warning(LogEventType.MEDIA_REFERENCE, f"Failed to resolve media reference: {file_id}", combined_data)
+    
+    def media_format(self, file_path: str, media_type: str, data: Optional[Dict[str, Any]] = None):
+        """
+        Log media format detection and validation.
+        
+        Args:
+            file_path: Path to the media file
+            media_type: Detected media type
+            data: Additional format information
+        """
+        combined_data = {"file_path": file_path, "media_type": media_type}
+        if data:
+            combined_data.update(data)
+            
+        self.info(LogEventType.MEDIA_FORMAT, f"Detected {media_type} format: {data.get('detected_format', 'unknown')}", combined_data)
+    
+    def media_validation(self, file_path: str, valid: bool, data: Optional[Dict[str, Any]] = None):
+        """
+        Log media validation results.
+        
+        Args:
+            file_path: Path to the media file
+            valid: Whether the media is valid
+            data: Additional validation information
+        """
+        combined_data = {
+            "file_path": file_path,
+            "valid": valid,
+            "media_type": data.get("media_type", "unknown") if data else "unknown"
+        }
+        
+        if data:
+            combined_data.update(data)
+            
+        if valid:
+            self.info(LogEventType.MEDIA_VALIDATION, f"Media validation passed: {file_path}", combined_data)
+        else:
+            self.warning(LogEventType.MEDIA_VALIDATION, f"Media validation failed: {file_path}", combined_data)
+    
+    def media_platform_operation(self, platform: str, operation: str, data: Optional[Dict[str, Any]] = None):
+        """
+        Log platform-specific media operations.
+        
+        Args:
+            platform: Platform name (telegram, whatsapp, etc.)
+            operation: Operation being performed
+            data: Additional operation data
+        """
+        combined_data = {"platform": platform, "operation": operation}
+        if data:
+            combined_data.update(data)
+            
+        # Use the platform-specific log event type if available
+        event_type = getattr(LogEventType, f"MEDIA_{platform.upper()}", LogEventType.MEDIA)
+        self.info(event_type, f"Using {platform} API method '{data.get('method', operation)}' for media type '{data.get('media_type', 'unknown')}'", combined_data)
+    
+    def media_error(self, error_type: str, media_type: str, data: Optional[Dict[str, Any]] = None, exc_info=None):
+        """
+        Log media processing errors with detailed information.
+        
+        Args:
+            error_type: Type of error encountered
+            media_type: Type of media being processed
+            data: Additional error information
+            exc_info: Exception information
+        """
+        combined_data = {"error_type": error_type, "media_type": media_type}
+        if data:
+            combined_data.update(data)
+            
+        if exc_info:
+            combined_data.update({
+                "exception_type": type(exc_info).__name__,
+                "exception_message": str(exc_info),
+                "traceback": traceback.format_exc()
+            })
+            
+        self.error(LogEventType.MEDIA_ERROR, f"Media error ({error_type}): {media_type}", combined_data)
     
     def webhook_received(self, platform: str, data: Optional[Dict[str, Any]] = None):
         """Log a webhook event"""
