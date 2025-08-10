@@ -17,10 +17,13 @@ Welcome to the GET INN Restaurant Platform documentation. This repository contai
 ### Modules
 
 #### Bot Management
-- [Overview](modules/bot-management/overview.md) - Bot management system overview
-- [Scenario Format](modules/bot-management/scenario-format.md) - Bot scenario specification
-- [Webhook Management](modules/bot-management/webhook-management.md) - Telegram webhook integration
-- [Conversation Logging](modules/bot-management/conversation-logging.md) - Bot conversation logging
+- [Overview](modules/bot-management/overview.md) - Comprehensive bot management system overview and architecture
+- [API Reference](modules/bot-management/api-reference.md) - Complete API documentation for bot management
+- [Scenario Format](modules/bot-management/scenario-format.md) - Bot scenario specification and examples
+- [Auto-Transitions](modules/bot-management/auto-transitions.md) - Automatic conversation flow control
+- [Media System](modules/bot-management/media-system.md) - Rich media handling and processing
+- [Webhook Management](modules/bot-management/webhook-management.md) - Platform webhook integration
+- [Conversation Logging](modules/bot-management/conversation-logging.md) - Logging and debugging system
 
 #### AI Tools
 - [Azure OpenAI](modules/ai-tools/azure-openai.md) - Azure OpenAI integration

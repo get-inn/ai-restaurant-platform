@@ -13,14 +13,13 @@ A bot scenario has the following basic structure:
 ```json
 {
   "version": "1.0",
-  "metadata": {
-    "name": "Example Scenario",
-    "description": "An example bot scenario",
-    "author": "GET INN Developer"
-  },
-  "steps": [
-    {
+  "name": "Example Scenario",
+  "description": "An example bot scenario",
+  "start_step": "welcome",
+  "steps": {
+    "welcome": {
       "id": "welcome",
+      "type": "message",
       "message": {
         "text": "Hello! What's your name?",
         "media": []
@@ -31,16 +30,39 @@ A bot scenario has the following basic structure:
       },
       "next_step": "ask_lastname"
     },
-    // More steps...
-  ],
-  "conditions": [
-    {
-      "if": "citizenship == 'РФ'",
-      "then": "show_rf_docs",
-      "else": "show_sng_docs"
+    "ask_lastname": {
+      "id": "ask_lastname",
+      "type": "message",
+      "message": {
+        "text": "What's your last name?",
+        "media": []
+      },
+      "expected_input": {
+        "type": "text",
+        "variable": "last_name"
+      },
+      "next_step": "finish"
     }
-    // More conditions...
-  ]
+    // More steps...
+  },
+  "metadata": {
+    "created_at": "2023-07-01",
+    "updated_at": "2023-07-15",
+    "version_history": [
+      {
+        "version": "1.0",
+        "description": "Initial version",
+        "date": "2023-07-01"
+      }
+    ],
+    "platforms": ["telegram", "whatsapp"]
+  },
+  "variables_mapping": {
+    "position": {
+      "cook": "Повар",
+      "manager": "Менеджер"
+    }
+  }
 }
 ```
 
@@ -52,36 +74,42 @@ The `metadata` object contains descriptive information about the scenario:
 
 ```json
 "metadata": {
-  "name": "Employee Onboarding",
-  "description": "Guides new employees through the onboarding process",
-  "author": "HR Department",
   "created_at": "2023-07-10",
   "updated_at": "2023-07-15",
-  "version": "1.2"
+  "version_history": [
+    {
+      "version": "1.0",
+      "description": "Initial version",
+      "date": "2023-07-01"
+    }
+  ],
+  "platforms": ["telegram", "whatsapp"]
 }
 ```
 
 ### Steps
 
-The `steps` array is the core of the scenario, defining each interaction in the conversation. Each step has:
+The `steps` object is the core of the scenario, with each key representing a unique step ID. Each step has:
 
-- **id**: Unique identifier for the step
+- **id**: Unique identifier for the step (should match the key in the steps object)
+- **type**: Type of step (e.g., "message", "conditional_message")
 - **message**: The content to send to the user
 - **expected_input**: What type of input is expected from the user
-- **next_step**: The ID of the next step to execute
+- **next_step**: The ID of the next step to execute or a conditional structure
 
 Example step:
 
 ```json
-{
+"ask_position": {
   "id": "ask_position",
+  "type": "message",
   "message": {
     "text": "What's your position in the company?",
     "media": [
       {
         "type": "image",
-        "url": "https://example.com/positions.jpg",
-        "caption": "Our team positions"
+        "description": "Our team positions",
+        "file_id": "positions_image"
       }
     ]
   },
@@ -112,8 +140,8 @@ The `message` object defines what is sent to the user:
   "media": [
     {
       "type": "image",
-      "url": "https://example.com/sample_passport.jpg",
-      "caption": "Example of a passport photo"
+      "description": "Example of a passport photo",
+      "file_id": "passport_example"
     }
   ]
 }
@@ -132,7 +160,9 @@ The `expected_input` object defines what the bot expects from the user:
   "validation": {
     "required": true,
     "min_length": 2,
-    "max_length": 100
+    "max_length": 100,
+    "pattern": "^[A-Za-z\\s]{2,50}$",
+    "error_message": "Please enter a valid name (2-50 letters only)"
   }
 }
 ```
@@ -142,10 +172,7 @@ The `expected_input` object defines what the bot expects from the user:
 ```json
 "expected_input": {
   "type": "button",
-  "variable": "gender",
-  "validation": {
-    "required": true
-  }
+  "variable": "gender"
 }
 ```
 
@@ -168,10 +195,7 @@ The `expected_input` object defines what the bot expects from the user:
 ```json
 "expected_input": {
   "type": "phone",
-  "variable": "contact_number",
-  "validation": {
-    "required": true
-  }
+  "variable": "contact_number"
 }
 ```
 
@@ -180,10 +204,7 @@ The `expected_input` object defines what the bot expects from the user:
 ```json
 "expected_input": {
   "type": "email",
-  "variable": "email_address",
-  "validation": {
-    "required": true
-  }
+  "variable": "email_address"
 }
 ```
 
@@ -206,10 +227,7 @@ The `expected_input` object defines what the bot expects from the user:
 ```json
 "expected_input": {
   "type": "location",
-  "variable": "current_location",
-  "validation": {
-    "required": true
-  }
+  "variable": "current_location"
 }
 ```
 
@@ -225,42 +243,57 @@ Buttons provide predefined options for the user to select:
 ]
 ```
 
-### Conditions
+### Step Types
 
-The `conditions` array defines branching logic in the conversation:
+The `type` field in a step indicates how the step should be processed:
+
+#### Message Step
+
+Standard message step with text and optional media:
 
 ```json
-"conditions": [
-  {
-    "id": "check_citizenship",
-    "if": "citizenship == 'РФ'",
-    "then": "show_rf_docs",
-    "else": "show_sng_docs"
+"welcome": {
+  "id": "welcome",
+  "type": "message",
+  "message": {
+    "text": "Hello! Welcome to our service."
   },
-  {
-    "id": "check_experience",
-    "if": "years_experience > 3",
-    "then": "experienced_path",
-    "else_if": "years_experience > 0",
-    "then_else_if": "some_experience_path",
-    "else": "no_experience_path"
-  }
-]
-```
-
-## Advanced Features
-
-### Dynamic Messages
-
-Messages can include variable substitution:
-
-```json
-"message": {
-  "text": "Thank you, ${first_name}! How many years of experience do you have?"
+  "next_step": "next_step_id"
 }
 ```
 
-### Step Transitions
+#### Conditional Message Step
+
+Sends different messages based on conditions:
+
+```json
+"greeting": {
+  "id": "greeting",
+  "type": "conditional_message",
+  "conditions": [
+    {
+      "if": "time_of_day == 'morning'",
+      "message": {
+        "text": "Good morning!"
+      }
+    },
+    {
+      "if": "time_of_day == 'evening'",
+      "message": {
+        "text": "Good evening!"
+      }
+    },
+    {
+      "message": {
+        "text": "Hello!"
+      }
+    }
+  ],
+  "next_step": "next_step_id"
+}
+```
+
+### Next Step Logic
 
 There are several ways to define the next step:
 
@@ -270,47 +303,62 @@ There are several ways to define the next step:
 "next_step": "ask_experience"
 ```
 
+#### Auto Next
+
+Automatically proceed to the next step without waiting for user input:
+
+```json
+"next_step": "next_step_id",
+"auto_next": true
+```
+
 #### Conditional Next Step
 
 ```json
 "next_step": {
-  "condition": "position == 'cook'",
-  "if_true": "cook_experience",
-  "if_false": "general_experience"
+  "type": "conditional",
+  "conditions": [
+    {
+      "if": "position == 'cook'",
+      "then": "cook_experience"
+    },
+    {
+      "if": "position == 'manager'",
+      "then": "manager_experience"
+    },
+    {
+      "then": "general_experience"  // Default case
+    }
+  ]
 }
 ```
 
-#### Multiple Conditions
+### Variables and Templating
+
+Variables can be referenced in messages using double curly braces:
 
 ```json
-"next_step": [
-  {
-    "condition": "position == 'cook'",
-    "step": "cook_experience"
-  },
-  {
-    "condition": "position == 'manager'",
-    "step": "manager_experience"
-  },
-  {
-    "step": "general_experience"  // Default case
+"message": {
+  "text": "Thank you, {{first_name}}! How many years of experience do you have?"
+}
+```
+
+### Variables Mapping
+
+The `variables_mapping` object defines how values stored in variables map to display text:
+
+```json
+"variables_mapping": {
+  "position": {
+    "food-guide": "Фуд-гид",
+    "cook": "Повар",
+    "manager": "Менеджер",
+    "office": "Я из офиса 🤓"
   }
-]
-```
-
-### Input Validation
-
-Validations can be applied to ensure the user provides acceptable input:
-
-```json
-"validation": {
-  "required": true,
-  "pattern": "^[A-Za-z\\s]{2,50}$",
-  "error_message": "Please enter a valid name (2-50 letters only)"
 }
 ```
 
-### Media Support
+## Media Support
 
 Multiple types of media can be included in messages:
 
@@ -318,179 +366,61 @@ Multiple types of media can be included in messages:
 "media": [
   {
     "type": "image",
-    "url": "https://example.com/welcome.jpg",
-    "caption": "Welcome to our team!"
+    "description": "Welcome to our team!",
+    "file_id": "welcome_image"
   },
   {
     "type": "video",
-    "url": "https://example.com/intro.mp4",
-    "thumbnail": "https://example.com/intro_thumb.jpg",
-    "caption": "Introduction to our company"
+    "description": "Introduction to our company",
+    "file_id": "intro_video"
   },
   {
     "type": "document",
-    "url": "https://example.com/handbook.pdf",
-    "caption": "Employee Handbook"
+    "description": "Employee Handbook",
+    "file_id": "employee_handbook"
   }
 ]
 ```
 
-### Quick Replies
+## Advanced Features
 
-Quick replies provide temporary button options that disappear after selection:
+### Menu System
 
-```json
-"quick_replies": [
-  {"text": "Today", "value": "today"},
-  {"text": "Tomorrow", "value": "tomorrow"},
-  {"text": "Next week", "value": "next_week"}
-]
-```
-
-## Integration with Backend
-
-### API Calls
-
-Scenarios can include API calls to fetch or submit data:
+You can create a menu system with different options:
 
 ```json
-"api_call": {
-  "endpoint": "/api/v1/restaurants",
-  "method": "GET",
-  "store_result": "available_restaurants",
-  "next_step": "show_restaurants"
-}
-```
-
-### Data Processing
-
-Process collected data or API results:
-
-```json
-"data_processing": {
-  "transform": "available_restaurants.map(r => ({text: r.name, value: r.id}))",
-  "store_result": "restaurant_buttons",
-  "next_step": "ask_restaurant"
-}
-```
-
-## Example Scenario
-
-Here's a complete example of a simple onboarding scenario:
-
-```json
-{
-  "version": "1.0",
-  "metadata": {
-    "name": "Employee Onboarding",
-    "description": "Basic onboarding for new employees",
-    "author": "HR Team",
-    "created_at": "2023-07-01"
+"menu": {
+  "id": "menu",
+  "type": "message",
+  "message": {
+    "text": "📂 What would you like to view?"
   },
-  "steps": [
-    {
-      "id": "welcome",
-      "message": {
-        "text": "Welcome to GET INN! I'm your onboarding assistant. What's your name?",
-        "media": [
-          {
-            "type": "image",
-            "url": "https://example.com/welcome.jpg",
-            "caption": "Welcome aboard!"
-          }
-        ]
-      },
-      "expected_input": {
-        "type": "text",
-        "variable": "first_name",
-        "validation": {
-          "required": true,
-          "min_length": 2
-        }
-      },
-      "next_step": "ask_position"
-    },
-    {
-      "id": "ask_position",
-      "message": {
-        "text": "Nice to meet you, ${first_name}! What position are you applying for?"
-      },
-      "buttons": [
-        {"text": "Cook", "value": "cook"},
-        {"text": "Server", "value": "server"},
-        {"text": "Manager", "value": "manager"},
-        {"text": "Other", "value": "other"}
-      ],
-      "expected_input": {
-        "type": "button",
-        "variable": "position"
-      },
-      "next_step": {
-        "condition": "position == 'other'",
-        "if_true": "ask_other_position",
-        "if_false": "ask_experience"
-      }
-    },
-    {
-      "id": "ask_other_position",
-      "message": {
-        "text": "Please specify what position you are applying for:"
-      },
-      "expected_input": {
-        "type": "text",
-        "variable": "other_position"
-      },
-      "next_step": "ask_experience"
-    },
-    {
-      "id": "ask_experience",
-      "message": {
-        "text": "How many years of experience do you have in this role?"
-      },
-      "expected_input": {
-        "type": "number",
-        "variable": "years_experience",
-        "validation": {
-          "required": true,
-          "min": 0,
-          "max": 50
-        }
-      },
-      "next_step": "ask_documents"
-    },
-    {
-      "id": "ask_documents",
-      "message": {
-        "text": "Please upload your resume/CV."
-      },
-      "expected_input": {
-        "type": "file",
-        "variable": "resume",
-        "validation": {
-          "required": true,
-          "allowed_types": ["application/pdf", "application/msword"]
-        }
-      },
-      "next_step": "finish"
-    },
-    {
-      "id": "finish",
-      "message": {
-        "text": "Thank you for completing the initial onboarding, ${first_name}! Our HR team will contact you soon with next steps."
-      },
-      "next_step": null
-    }
+  "buttons": [
+    {"text": "Ideology", "value": "ideology"},
+    {"text": "Responsibilities", "value": "duties"},
+    {"text": "Contacts", "value": "contacts"}
   ],
-  "conditions": [
-    {
-      "id": "check_experience",
-      "if": "years_experience > 3",
-      "then": "ask_documents",
-      "else_if": "position == 'manager'",
-      "then_else_if": "ask_management_experience",
-      "else": "ask_documents"
-    }
-  ]
+  "expected_input": {
+    "type": "button",
+    "variable": "menu_choice"
+  },
+  "next_step": {
+    "type": "conditional",
+    "conditions": [
+      {
+        "if": "menu_choice == 'ideology'",
+        "then": "menu_ideology"
+      },
+      {
+        "if": "menu_choice == 'duties'",
+        "then": "menu_duties"
+      },
+      {
+        "if": "menu_choice == 'contacts'",
+        "then": "menu_contacts"
+      }
+    ]
+  }
 }
 ```
 
@@ -515,6 +445,7 @@ Different messaging platforms have varying capabilities. The bot management syst
 1. **Use Clear Step IDs**:
    - Make step IDs descriptive and readable
    - Use consistent naming conventions
+   - Ensure step IDs match the keys in the steps object
 
 2. **Plan for Error Handling**:
    - Include validation for expected inputs
@@ -523,8 +454,8 @@ Different messaging platforms have varying capabilities. The bot management syst
 
 3. **Optimize Media Usage**:
    - Keep images under 1MB
-   - Host media on a reliable CDN
-   - Include thumbnails for videos
+   - Use a consistent naming convention for file_ids
+   - Make sure file_ids referenced in scenarios exist in the media store
 
 4. **Test Across Platforms**:
    - Ensure scenarios work on all supported platforms
@@ -538,28 +469,84 @@ Different messaging platforms have varying capabilities. The bot management syst
 6. **Variables Naming**:
    - Use clear, descriptive variable names
    - Follow snake_case naming convention
-   - Document important variables
+   - Document important variables in variables_mapping
 
-## Localization
+## Complete Example
 
-Scenarios support multiple languages:
+Here's a simplified example of a bot scenario:
 
 ```json
-"message": {
-  "text": {
-    "en": "What is your name?",
-    "ru": "Как вас зовут?",
-    "es": "¿Cómo te llamas?"
+{
+  "version": "1.0",
+  "name": "Employee Onboarding",
+  "description": "Basic onboarding for new employees",
+  "start_step": "welcome",
+  "steps": {
+    "welcome": {
+      "id": "welcome",
+      "type": "message",
+      "message": {
+        "text": "Welcome! What's your name?",
+        "media": [
+          {
+            "type": "image",
+            "description": "Welcome aboard!",
+            "file_id": "welcome_image"
+          }
+        ]
+      },
+      "expected_input": {
+        "type": "text",
+        "variable": "first_name",
+        "validation": {
+          "required": true,
+          "min_length": 2
+        }
+      },
+      "next_step": "ask_position"
+    },
+    "ask_position": {
+      "id": "ask_position",
+      "type": "message",
+      "message": {
+        "text": "Nice to meet you, {{first_name}}! What position are you applying for?"
+      },
+      "buttons": [
+        {"text": "Cook", "value": "cook"},
+        {"text": "Manager", "value": "manager"}
+      ],
+      "expected_input": {
+        "type": "button",
+        "variable": "position"
+      },
+      "next_step": {
+        "type": "conditional",
+        "conditions": [
+          {
+            "if": "position == 'cook'",
+            "then": "cook_questions"
+          },
+          {
+            "if": "position == 'manager'",
+            "then": "manager_questions"
+          }
+        ]
+      }
+    }
+  },
+  "metadata": {
+    "created_at": "2023-07-01",
+    "updated_at": "2023-07-15",
+    "platforms": ["telegram", "whatsapp"]
+  },
+  "variables_mapping": {
+    "position": {
+      "cook": "Cook",
+      "manager": "Manager"
+    }
   }
 }
 ```
-
-## Security Considerations
-
-1. **Sensitive Data**: Do not include sensitive information in the scenario definition
-2. **Validation**: Always validate user input to prevent injection attacks
-3. **API Integration**: Use secure endpoints with proper authentication
-4. **File Uploads**: Validate file types and sizes before processing
 
 ## Debugging and Testing
 
@@ -574,3 +561,4 @@ python -m scripts.bots.utils.view_bot_logs --bot-id BOT_ID
 - [Bot Management Overview](overview.md) - Overview of the bot management system
 - [Webhook Management](webhook-management.md) - Telegram webhook integration
 - [Conversation Logging](conversation-logging.md) - Bot conversation logging
+- [Example Scenario](example-scenario/onboarding_scenario.json) - Complete onboarding scenario example
