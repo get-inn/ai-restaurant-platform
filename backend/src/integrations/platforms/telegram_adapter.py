@@ -833,7 +833,35 @@ class TelegramAdapter(PlatformAdapter):
                             "error_code": error_code
                         }
             except Exception as e:
-                logger.error(LogEventType.ERROR, f"Exception sending media with buttons: {str(e)}")
+                logger.error(LogEventType.ERROR, f"Exception sending media with buttons: {str(e)}", {
+                    "exception_type": type(e).__name__,
+                    "chat_id": chat_id,
+                    "media_type": media_type,
+                    "file_path": actual_file_path,
+                    "file_exists": os.path.exists(actual_file_path) if actual_file_path else False,
+                    "buttons_count": len(buttons) if buttons else 0,
+                    "has_caption": bool(caption)
+                }, exc_info=True)
+                
+                # Fallback: try simplified approach
+                logger.info(LogEventType.MEDIA, "Attempting fallback: send media and buttons separately")
+                try:
+                    # Send media without buttons first
+                    media_result = await self.send_media_message(chat_id, media_type, actual_file_path, caption)
+                    if media_result.get("success"):
+                        # Then send buttons as a separate message
+                        if buttons:
+                            button_result = await self.send_buttons(chat_id, "Choose an option:", buttons)
+                            logger.info(LogEventType.MEDIA, "Fallback successful: sent media and buttons separately")
+                            return {
+                                "success": True,
+                                "message_id": media_result.get("message_id"),
+                                "fallback_used": True
+                            }
+                        return media_result
+                except Exception as fallback_error:
+                    logger.error(LogEventType.ERROR, f"Fallback also failed: {str(fallback_error)}")
+                    
                 return {"success": False, "error": str(e)}
     async def send_media_group(
         self,

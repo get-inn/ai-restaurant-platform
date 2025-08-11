@@ -325,6 +325,9 @@ class DialogService:
         - @AUTO_TRANSITION@ - Auto transition with normal message sending
         - @AUTO_TRANSITION_NO_MESSAGE@ - Auto transition with state updates only, no message sending
         """
+        # Check for auto-transition markers first
+        is_auto_transition = user_input in ["@AUTO_TRANSITION@", "@AUTO_TRANSITION_NO_MESSAGE@"]
+        
         # First, get or create dialog state
         dialog_state = await DialogService.get_dialog_state(db, bot_id, platform, platform_chat_id)
         
@@ -469,83 +472,109 @@ class DialogService:
             if not current_step_data:
                 return None
                 
-            # Update collected data based on user input and expected input type
-            expected_input = current_step_data.get("expected_input", {})
-            variable_name = expected_input.get("variable", "")
-            
-            if variable_name:
-                # Update the dialog state with the collected data
-                collected_data = dialog_state.collected_data.copy()
-                collected_data[variable_name] = user_input
-                
-                update_data = BotDialogStateUpdate(
-                    collected_data=collected_data
-                )
-                
-                # If there's a next step defined, move to it
+            # For auto-transitions, just advance to next step without processing user input
+            if is_auto_transition:
+                # Get the next step directly
                 next_step = current_step_data.get("next_step")
                 
-                # Handle different types of next_step values
-                if isinstance(next_step, dict):
-                    # This is a conditional step
-                    evaluated_step = DialogService._evaluate_conditional_step(next_step, collected_data)
-                    if evaluated_step:
-                        # Use the evaluated target step
-                        update_data.current_step = evaluated_step
-                elif next_step:
-                    # This is a simple string step ID
-                    update_data.current_step = next_step
+                if next_step:
+                    # Handle different types of next_step values
+                    if isinstance(next_step, dict):
+                        # This is a conditional step
+                        evaluated_step = DialogService._evaluate_conditional_step(next_step, dialog_state.collected_data)
+                        if evaluated_step:
+                            update_data = BotDialogStateUpdate(current_step=evaluated_step)
+                            dialog_state = await DialogService.update_dialog_state(db, dialog_state.id, update_data)
+                    else:
+                        # This is a simple string step ID
+                        update_data = BotDialogStateUpdate(current_step=next_step)
+                        dialog_state = await DialogService.update_dialog_state(db, dialog_state.id, update_data)
                 
-                dialog_state = await DialogService.update_dialog_state(db, dialog_state.id, update_data)
+                # After state change, fall through to normal step processing to get the content
+            
+            if not is_auto_transition:
+                # Normal user input processing
+                expected_input = current_step_data.get("expected_input", {})
+                variable_name = expected_input.get("variable", "")
                 
-                # Find the next step in the scenario
-                steps = scenario.scenario_data.get("steps", {})
-                next_step_data = None
+                if variable_name:
+                    # Update the dialog state with the collected data
+                    collected_data = dialog_state.collected_data.copy()
+                    collected_data[variable_name] = user_input
+                    
+                    update_data = BotDialogStateUpdate(
+                        collected_data=collected_data
+                    )
+                    
+                    # If there's a next step defined, move to it
+                    next_step = current_step_data.get("next_step")
+                    
+                    # Handle different types of next_step values
+                    if isinstance(next_step, dict):
+                        # This is a conditional step
+                        evaluated_step = DialogService._evaluate_conditional_step(next_step, collected_data)
+                        if evaluated_step:
+                            # Use the evaluated target step
+                            update_data.current_step = evaluated_step
+                    elif next_step:
+                        # This is a simple string step ID
+                        update_data.current_step = next_step
+                    
+                    dialog_state = await DialogService.update_dialog_state(db, dialog_state.id, update_data)
+            
+            # Get the updated dialog state (after potential auto-transition)
+            dialog_state = await DialogService.get_dialog_state_by_id(db, dialog_state.id)
+            if not dialog_state:
+                return None
                 
-                # Get the updated dialog state after evaluating conditionals
-                dialog_state = await DialogService.get_dialog_state_by_id(db, dialog_state.id)
-                if not dialog_state:
+            # Find the current step in the scenario
+            steps = scenario.scenario_data.get("steps", {})
+            current_step_id = dialog_state.current_step
+            
+            # Handle different formats of steps: could be list or dictionary
+            step_data = None
+            if isinstance(steps, list):
+                # If steps is a list, find the step with matching id
+                step_data = next((s for s in steps if s.get("id") == current_step_id), None)
+            elif isinstance(steps, dict):
+                # If steps is a dictionary, get the step by key
+                step_data = steps.get(current_step_id)
+                if step_data is not None and step_data.get("id") is None:
+                    # Ensure the step has an id field
+                    step_data = {**step_data, "id": current_step_id}
+            
+            if step_data:
+                # Use ScenarioProcessor to properly handle all step types including conditional_message
+                from src.bot_manager.scenario_processor import ScenarioProcessor
+                processor = ScenarioProcessor()
+                processed_step = processor.process_step(
+                    scenario_data=scenario.scenario_data,
+                    current_step_id=current_step_id,
+                    collected_data=dialog_state.collected_data
+                )
+                
+                if processed_step.get("error"):
+                    logger.error(f"Error processing step '{current_step_id}': {processed_step['error']}")
                     return None
-                    
-                # Use the resolved current_step from the database
-                next_step_id = dialog_state.current_step
                 
-                # Handle different formats of steps: could be list or dictionary
-                if isinstance(steps, list):
-                    # If steps is a list, find the step with matching id
-                    next_step_data = next((s for s in steps if s.get("id") == next_step_id), None)
-                elif isinstance(steps, dict):
-                    # If steps is a dictionary, get the step by key
-                    next_step_data = steps.get(next_step_id)
-                    if next_step_data is not None and next_step_data.get("id") is None:
-                        # Ensure the step has an id field
-                        next_step_data = {**next_step_data, "id": next_step_id}
-                
-                if next_step_data:
-                    # Process the message to replace variables
-                    message = next_step_data.get("message", {})
-                    processed_message = DialogService._replace_variables(message, dialog_state.collected_data, scenario.scenario_data)
-                    
+                if processed_step.get("message"):
                     # Log media content if present
-                    media = processed_message.get("media", [])
+                    media = processed_step["message"].get("media", [])
                     if media:
-                        import logging
-                        logger = logging.getLogger("dialog_service")
-                        logger.info(f"Media content found in step '{next_step_id}': {len(media)} items")
+                        logger.info(f"Media content found in step '{current_step_id}': {len(media)} items")
                         for i, media_item in enumerate(media):
                             logger.info(f"Media item {i+1}: type={media_item.get('type')}, file_id={media_item.get('file_id')}")
                     
-                    # Get auto_next properties from the step
-                    auto_next = next_step_data.get("auto_next", False)
-                    auto_next_delay = next_step_data.get("auto_next_delay", 1.5)
-                    
                     return {
-                        "message": processed_message,
-                        "buttons": next_step_data.get("buttons", []),
-                        "next_step": next_step_data.get("next_step"),
-                        "auto_next": auto_next,
-                        "auto_next_delay": auto_next_delay
+                        "message": processed_step["message"],
+                        "buttons": processed_step.get("buttons", []),
+                        "next_step": processed_step.get("next_step_id"),
+                        "auto_next": processed_step.get("auto_next", False),
+                        "auto_next_delay": processed_step.get("auto_next_delay", 1.5)
                     }
+                else:
+                    logger.warning(f"No message content generated for step '{current_step_id}'")
+                    return None
             
             # Process the message to replace variables
             message = {"text": "I'm not sure what to do next."}
