@@ -47,6 +47,31 @@ class MockAdapter:
         self.sent_messages.append({"type": "text", "chat_id": chat_id, "text": text})
         return {"success": True, "message_id": str(uuid4())}
     
+    async def send_message(self, chat_id, text, buttons=None):
+        """Mock sending a message with optional buttons (for MediaManager compatibility)."""
+        self.logger.info(LogEventType.ADAPTER, f"Mock send_message to {chat_id}")
+        if buttons:
+            return await self.send_buttons(chat_id, text, buttons)
+        else:
+            return await self.send_text_message(chat_id, text)
+    
+    async def send_media(self, chat_id, media_type, file_id, caption=None, buttons=None):
+        """Mock sending media (for MediaManager compatibility)."""
+        self.logger.info(LogEventType.ADAPTER, f"Mock send_media to {chat_id}: {media_type}")
+        message_data = {
+            "type": "media",
+            "chat_id": chat_id,
+            "media_type": media_type,
+            "file_id": file_id,
+            "caption": caption
+        }
+        if buttons:
+            message_data["buttons"] = buttons
+            message_data["type"] = "media_with_buttons"
+        
+        self.sent_messages.append(message_data)
+        return {"success": True, "message_id": str(uuid4())}
+    
     async def send_buttons(self, chat_id, text, buttons):
         """Mock sending buttons."""
         self.logger.info(LogEventType.ADAPTER, f"Mock send_buttons to {chat_id}")
@@ -196,60 +221,9 @@ async def test_single_media_with_buttons():
         async def mock_retrieve_media(*args, **kwargs):
             return {"success": True, "file_path": image_path}
         
-        # Patch the process_media_sending method to use our test file
-        original_method = dialog_manager._process_media_sending
-        
-        async def mock_process_media_sending(self, adapter, chat_id, media, message_text, buttons, platform):
-            logger.info(LogEventType.MEDIA, f"Mock processing media with file_id: {media[0].file_id if hasattr(media[0], 'file_id') else media[0].get('file_id')}")
-            
-            if buttons:
-                # For single media item
-                if len(media) == 1:
-                    media_item = media[0]
-                    media_type = media_item.type if hasattr(media_item, 'type') else media_item.get('type', 'image')
-                    return await adapter.send_media_with_buttons(
-                        chat_id=chat_id,
-                        media_type=media_type,
-                        file_path=image_path,
-                        caption=message_text,
-                        buttons=buttons
-                    )
-                # For multiple media items
-                else:
-                    result = await adapter.send_media_group(
-                        chat_id=chat_id,
-                        media_items=media,
-                        caption=message_text
-                    )
-                    # Send buttons as follow-up
-                    if result.get("success", False):
-                        button_result = await adapter.send_buttons(
-                            chat_id=chat_id,
-                            text="Please select an option:",
-                            buttons=buttons
-                        )
-                        result["buttons_sent"] = button_result.get("success", False)
-                    return result
-            else:
-                # For single media item
-                if len(media) == 1:
-                    media_item = media[0]
-                    media_type = media_item.type if hasattr(media_item, 'type') else media_item.get('type', 'image')
-                    return await adapter.send_media_message(
-                        chat_id=chat_id,
-                        media_type=media_type,
-                        file_path=image_path,
-                        caption=message_text
-                    )
-                # For multiple media items
-                else:
-                    return await adapter.send_media_group(
-                        chat_id=chat_id,
-                        media_items=media,
-                        caption=message_text
-                    )
-            
-        dialog_manager._process_media_sending = mock_process_media_sending.__get__(dialog_manager)
+        # Note: With the refactored DialogManager using MediaManager, 
+        # we don't need to mock internal methods anymore.
+        # The MediaManager will handle all media processing automatically.
         
         # Send the message with media and buttons
         await dialog_manager.send_message(
@@ -259,9 +233,6 @@ async def test_single_media_with_buttons():
             message=dialog_message,
             buttons=buttons
         )
-        
-        # Restore the original method
-        dialog_manager._process_media_sending = original_method
         
         # Print results
         print("\nMedia with buttons test completed!")

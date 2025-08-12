@@ -36,3 +36,39 @@ class ConflictError(HTTPException):
             status_code=status.HTTP_409_CONFLICT,
             detail=detail,
         )
+
+
+# Bot Management Specific Exceptions
+class BotNotFoundError(NotFoundError):
+    def __init__(self, bot_id: str = None):
+        detail = f"Bot {bot_id} not found" if bot_id else "Bot not found"
+        super().__init__(detail=detail)
+
+
+class BotScenarioNotFoundError(NotFoundError):
+    def __init__(self, scenario_id: str = None):
+        detail = f"Bot scenario {scenario_id} not found" if scenario_id else "Bot scenario not found"
+        super().__init__(detail=detail)
+
+
+class DialogStateNotFoundError(NotFoundError):
+    def __init__(self, dialog_id: str = None):
+        detail = f"Dialog state {dialog_id} not found" if dialog_id else "Dialog state not found"
+        super().__init__(detail=detail)
+
+
+class BotCredentialError(BadRequestError):
+    def __init__(self, platform: str = None, detail: str = None):
+        if not detail:
+            detail = f"Invalid credentials for platform {platform}" if platform else "Invalid bot credentials"
+        super().__init__(detail=detail)
+
+
+class BotOperationError(HTTPException):
+    def __init__(self, detail: str = "Bot operation failed", status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR):
+        super().__init__(status_code=status_code, detail=detail)
+
+
+class WebhookConfigurationError(BadRequestError):
+    def __init__(self, detail: str = "Webhook configuration error"):
+        super().__init__(detail=detail)

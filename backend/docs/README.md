@@ -18,6 +18,8 @@ Welcome to the GET INN Restaurant Platform documentation. This repository contai
 
 #### Bot Management
 - [Overview](modules/bot-management/overview.md) - Comprehensive bot management system overview and architecture
+- [MediaManager](modules/bot-management/media-manager.md) - Dedicated media processing component (NEW)
+- [Refactoring Plan](modules/bot-management/refactoring-plan.md) - System refactoring achievements and status
 - [API Reference](modules/bot-management/api-reference.md) - Complete API documentation for bot management
 - [Scenario Format](modules/bot-management/scenario-format.md) - Bot scenario specification and examples
 - [Auto-Transitions](modules/bot-management/auto-transitions.md) - Automatic conversation flow control
@@ -38,10 +40,22 @@ Welcome to the GET INN Restaurant Platform documentation. This repository contai
 - [Database Migrations](guides/database-migrations.md) - Working with database migrations
 - [Adding Bot Features](guides/adding-bot-features.md) - Implementing new bot functionality
 
+## Recent Improvements (2025)
+
+The bot management system has undergone comprehensive refactoring with significant architectural improvements:
+
+- ✅ **MediaManager Extraction**: Dedicated media processing component extracted from DialogManager
+- ✅ **Code Reduction**: DialogManager reduced by 37% (1,403 → 882 lines)
+- ✅ **Shared Utilities**: Permission system, error handlers, and validation utilities eliminate 200+ lines of duplicate code
+- ✅ **Enhanced Architecture**: Better separation of concerns and improved maintainability
+- ✅ **Production Stability**: All critical bugs fixed and full test coverage maintained
+
+For complete details, see the [Bot Management Refactoring Plan](modules/bot-management/refactoring-plan.md).
+
 ## Additional Resources
 
 - [Documentation Refactoring Plan](documentation_refactoring_plan.md) - Plan for the documentation restructuring
 
 ---
 
-**Note:** This documentation is under active development. Some sections may be incomplete or in progress.
+**Note:** This documentation is under active development and continuously updated to reflect the latest architectural improvements.

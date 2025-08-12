@@ -86,12 +86,46 @@ if LOG_FORMAT == "json":
     # JSON formatter for structured logging and tools like ELK
     class JsonFormatter(logging.Formatter):
         def format(self, record):
-            log_data = record.args.copy() if record.args else {}
+            # Handle context data passed as args
+            log_data = {}
+            message = ""
+            
+            try:
+                # Check if we have context data as an argument
+                if record.args and hasattr(record.args, '__len__') and len(record.args) > 0:
+                    # Check if first arg is context dict
+                    try:
+                        if isinstance(record.args[0], dict):
+                            # Context is first arg: logger.log(level, message, context)
+                            log_data.update(record.args[0])
+                            message = str(record.msg)
+                        elif len(record.args) >= 2 and isinstance(record.args[1], dict):
+                            # Context is second arg: logger.log(level, "%s", message, context)  
+                            log_data.update(record.args[1])
+                            message = str(record.args[0])
+                        else:
+                            # No context in args, use regular getMessage
+                            message = record.getMessage()
+                    except (IndexError, TypeError):
+                        message = record.getMessage()
+                else:
+                    # No args, use regular getMessage
+                    message = record.getMessage()
+                
+                # Handle SafeMessage objects
+                if hasattr(record.msg, 'msg'):
+                    message = record.msg.msg
+                
+            except Exception:
+                # Fallback to basic message
+                message = str(record.msg) if record.msg else "No message"
+            
+            # Add standard log fields
             log_data.update({
                 "timestamp": self.formatTime(record, "%Y-%m-%dT%H:%M:%S.%fZ"),
                 "level": record.levelname,
                 "logger": record.name,
-                "message": record.getMessage()
+                "message": message
             })
             
             # Add exception info if available
@@ -209,8 +243,26 @@ class ConversationLogger:
         # Clean sensitive data before logging
         self._clean_sensitive_data(log_context)
         
-        # Log the message with the combined context
-        logger.log(level, message, log_context)
+        # Create a safe message wrapper to prevent string formatting issues
+        class SafeMessage:
+            def __init__(self, msg):
+                self.msg = msg
+            def __str__(self):
+                return self.msg
+            def __mod__(self, other):
+                # Prevent % formatting by returning the original message
+                return self.msg
+            def __eq__(self, other):
+                # Make SafeMessage comparable to strings for test compatibility
+                if isinstance(other, str):
+                    return self.msg == other
+                return super().__eq__(other)
+            def __repr__(self):
+                return f'SafeMessage({repr(self.msg)})'
+        
+        # Use logger.log with safe message wrapper
+        safe_message = SafeMessage(message)
+        logger.log(level, safe_message, log_context)
     
     def _clean_sensitive_data(self, data: Dict[str, Any]):
         """

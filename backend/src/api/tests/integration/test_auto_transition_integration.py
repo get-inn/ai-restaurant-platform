@@ -11,7 +11,7 @@ from httpx import AsyncClient
 from fastapi import FastAPI
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.models import BotInstance, BotScenario, BotDialogState, BotPlatform
+from src.api.models import BotInstance, BotScenario, BotDialogState, BotPlatformCredential
 from src.api.schemas.bots.instance_schemas import BotInstanceCreate
 from src.api.schemas.bots.scenario_schemas import BotScenarioCreate
 from src.bot_manager.dialog_manager import DialogManager

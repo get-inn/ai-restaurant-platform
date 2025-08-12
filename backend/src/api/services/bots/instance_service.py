@@ -271,3 +271,80 @@ class InstanceService:
         credentials = result.scalars().all()
         
         return [BotPlatformCredentialDB.model_validate(cred) for cred in credentials]
+
+    @staticmethod
+    async def get_all_bots_admin(
+        db: AsyncSession,
+        account_id: Optional[UUID] = None,
+        skip: int = 0,
+        limit: int = 100,
+        active_only: bool = False
+    ) -> List[BotInstanceDB]:
+        """
+        Get all bots with admin-level filtering and pagination.
+        
+        Args:
+            db: Database session
+            account_id: Optional account ID filter
+            skip: Number of records to skip
+            limit: Maximum number of records to return
+            active_only: If True, only return active bots
+            
+        Returns:
+            List of bot instances
+        """
+        query = (
+            select(BotInstance)
+            .options(joinedload(BotInstance.platform_credentials))
+        )
+        
+        # Apply filters
+        if account_id:
+            query = query.where(BotInstance.account_id == account_id)
+        
+        if active_only:
+            query = query.where(BotInstance.is_active == True)
+        
+        # Add ordering and pagination
+        query = (
+            query
+            .order_by(BotInstance.created_at.desc())
+            .offset(skip)
+            .limit(limit)
+        )
+        
+        result = await db.execute(query)
+        bots = result.unique().scalars().all()
+        
+        return [BotInstanceDB.model_validate(bot) for bot in bots]
+
+    @staticmethod
+    async def count_all_bots_admin(
+        db: AsyncSession,
+        account_id: Optional[UUID] = None,
+        active_only: bool = False
+    ) -> int:
+        """
+        Count all bots with admin-level filtering.
+        
+        Args:
+            db: Database session
+            account_id: Optional account ID filter
+            active_only: If True, only count active bots
+            
+        Returns:
+            Count of bot instances
+        """
+        from sqlalchemy import func
+        
+        query = select(func.count(BotInstance.id))
+        
+        # Apply filters
+        if account_id:
+            query = query.where(BotInstance.account_id == account_id)
+        
+        if active_only:
+            query = query.where(BotInstance.is_active == True)
+        
+        result = await db.execute(query)
+        return result.scalar() or 0

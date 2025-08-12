@@ -9,7 +9,7 @@ This module is responsible for:
 5. Logging detailed conversation flows for debugging
 """
 
-from typing import Dict, Any, List, Optional, Union, Tuple
+from typing import Dict, Any, List, Optional, Union
 from uuid import UUID
 import json
 from datetime import datetime
@@ -29,7 +29,8 @@ from src.api.schemas.bots.dialog_schemas import (
 )
 from src.bot_manager.scenario_processor import ScenarioProcessor
 from src.bot_manager.state_repository import StateRepository
-from src.bot_manager.conversation_logger import get_logger, LogEventType, _thread_local
+from src.bot_manager.conversation_logger import get_logger, LogEventType, _thread_local, ConversationLogger
+from src.bot_manager.media_manager import MediaManager
 from src.integrations.platforms.base import PlatformAdapter
 
 
@@ -44,7 +45,8 @@ class DialogManager:
         db: AsyncSession,
         platform_adapters: Dict[str, PlatformAdapter] = None,
         state_repository: StateRepository = None,
-        scenario_processor: ScenarioProcessor = None
+        scenario_processor: ScenarioProcessor = None,
+        media_manager: MediaManager = None
     ):
         """
         Initialize the dialog manager.
@@ -54,12 +56,37 @@ class DialogManager:
             platform_adapters: Dict mapping platform names to adapter instances
             state_repository: Optional custom state repository
             scenario_processor: Optional custom scenario processor
+            media_manager: Optional custom media manager
         """
         self.db = db
         self.platform_adapters = platform_adapters or {}
         self.state_repository = state_repository or StateRepository(db)
         self.scenario_processor = scenario_processor or ScenarioProcessor()
         self.logger = get_logger()
+        # MediaManager will be initialized per conversation context
+        self._media_manager_class = media_manager.__class__ if media_manager else MediaManager
+    
+    def _get_media_manager(self, bot_id: UUID, platform: str, platform_chat_id: str) -> MediaManager:
+        """
+        Get a MediaManager instance for the current conversation context.
+        
+        Args:
+            bot_id: ID of the bot
+            platform: Platform identifier  
+            platform_chat_id: Chat ID in the platform
+            
+        Returns:
+            MediaManager instance with conversation context
+        """
+        # Create conversation logger for this specific context
+        conversation_logger = ConversationLogger(
+            bot_id=str(bot_id),
+            dialog_id=f"{platform}:{platform_chat_id}",
+            platform=platform,
+            platform_chat_id=platform_chat_id
+        )
+        
+        return self._media_manager_class(conversation_logger)
         
     async def register_platform_adapter(self, platform: str, adapter: PlatformAdapter) -> bool:
         """Register a platform adapter"""
@@ -715,6 +742,7 @@ class DialogManager:
     ) -> bool:
         """
         Send a message to a user through the appropriate platform adapter.
+        Uses the extracted MediaManager for all media processing.
         
         Args:
             bot_id: ID of the bot sending the message
@@ -731,554 +759,29 @@ class DialogManager:
             self.logger.error(LogEventType.ERROR, f"No adapter registered for platform {platform}")
             return False
         
-        # Extract message content based on type
-        message_text, media = self._extract_message_content(message)
-        
-        # Log the outgoing message
-        self._log_outgoing_message(message_text, media, buttons, platform, platform_chat_id, bot_id)
-        
-        # Process and send the message
-        if media:
-            # Message contains media content
-            result = await self._process_media_sending(
+        try:
+            # Get MediaManager instance for this conversation context
+            media_manager = self._get_media_manager(bot_id, platform, platform_chat_id)
+            
+            # Use MediaManager to process and send the message
+            result = await media_manager.process_message_sending(
                 adapter=adapter,
-                chat_id=platform_chat_id,
-                media=media,
-                message_text=message_text,
-                buttons=buttons,
-                platform=platform
-            )
-        else:
-            # Text-only message
-            result = await self._send_text_only_message(adapter, platform_chat_id, message_text, buttons)
-        
-        # Log enhanced scenario information for media messages
-        if media:
-            self._log_media_scenario(media, buttons, platform)
-            
-        return result.get("success", False)
-        
-    def _extract_message_content(self, message: Union[str, DialogMessage, Dict[str, Any]]) -> Tuple[str, List[Any]]:
-        """Extract text and media content from different message formats
-        
-        Args:
-            message: The message in any supported format
-            
-        Returns:
-            Tuple of (message_text, media_list)
-        """
-        if isinstance(message, str):
-            # String message - text only
-            return message, []
-        elif isinstance(message, dict):
-            # Dictionary message
-            return message.get("text", ""), message.get("media", [])
-        else:
-            # DialogMessage object
-            return getattr(message, 'text', ""), getattr(message, 'media', [])
-    
-    def _log_outgoing_message(
-        self, 
-        message_text: str, 
-        media: List[Any], 
-        buttons: Optional[List[Dict[str, str]]],
-        platform: str,
-        platform_chat_id: str,
-        bot_id: UUID
-    ) -> None:
-        """Log information about an outgoing message"""
-        # Extract button text for logging
-        button_texts = []
-        if buttons:
-            for btn in buttons:
-                if isinstance(btn, dict):
-                    button_texts.append(btn.get("text", ""))
-                else:
-                    button_texts.append(btn["text"])
-        
-        # Log data about this message
-        log_data = {
-            "has_buttons": bool(buttons),
-            "buttons": button_texts,
-            "has_media": bool(media),
-            "media_count": len(media) if media else 0,
-            "platform": platform,
-            "platform_chat_id": platform_chat_id,
-            "bot_id": str(bot_id)
-        }
-        
-        # Log the message content
-        self.logger.outgoing_message(message_text, log_data)
-        
-        # Additional logging for media content
-        if media:
-            self._log_media_content(media, buttons, platform, platform_chat_id, message_text)
-    
-    def _validate_media_items(self, media: List[Any]) -> bool:
-        """Validate media items to ensure they have required attributes
-        
-        Args:
-            media: List of media items to validate
-            
-        Returns:
-            True if at least one valid media item exists, False otherwise
-        """
-        valid_count = 0
-        invalid_items = []
-        
-        for i, item in enumerate(media):
-            # Check for required fields based on item type
-            if isinstance(item, dict):
-                if not item.get('file_id'):
-                    invalid_items.append({"index": i, "reason": "missing file_id", "item_type": "dict"})
-                else:
-                    valid_count += 1
-            else:  # Object-like item
-                if not hasattr(item, 'file_id') or not getattr(item, 'file_id'):
-                    invalid_items.append({"index": i, "reason": "missing file_id attribute", "item_type": type(item).__name__})
-                else:
-                    valid_count += 1
-        
-        # Log validation results if any issues found
-        if invalid_items:
-            self.logger.warning(LogEventType.MEDIA, f"Found {len(invalid_items)} invalid media items", {
-                "valid_count": valid_count,
-                "invalid_count": len(invalid_items),
-                "invalid_details": invalid_items
-            })
-        
-        return valid_count > 0
-
-    def _log_media_content(
-        self, 
-        media: List[Any], 
-        buttons: Optional[List[Dict[str, str]]],
-        platform: str,
-        platform_chat_id: str,
-        message_text: str
-    ) -> None:
-        """Log detailed information about media content"""
-        # Extract media details for logging
-        media_types = []
-        media_ids = []
-        media_details = []
-        
-        for m in media:
-            if isinstance(m, dict):
-                media_type = m.get('type', 'unknown')
-                file_id = m.get('file_id', 'unknown')
-                description = m.get('description', '')
-            else:  # Object
-                media_type = getattr(m, 'type', 'unknown')
-                file_id = getattr(m, 'file_id', 'unknown')
-                description = getattr(m, 'description', '')
-                
-            media_types.append(media_type)
-            media_ids.append(file_id)
-            media_details.append({
-                "type": media_type,
-                "file_id": file_id[:10] + "..." if len(file_id) > 10 else file_id,
-                "has_description": bool(description)
-            })
-        
-        # Log basic media content information
-        self.logger.info(LogEventType.MEDIA, f"Media content detected in message: {len(media)} items", {
-            "media_count": len(media),
-            "media_types": media_types,
-            "media_ids": media_ids,
-            "has_buttons": buttons is not None,
-            "platform": platform
-        })
-        
-        # Log more detailed processing information
-        self.logger.info(LogEventType.MEDIA, f"Processing media content: {len(media)} items", {
-            "media_count": len(media),
-            "chat_id": platform_chat_id,
-            "has_buttons": buttons is not None,
-            "button_count": len(buttons) if buttons else 0,
-            "message_text": message_text[:100] + "..." if message_text and len(message_text) > 100 else message_text,
-            "media_details": media_details
-        })
-    
-    def _log_media_scenario(
-        self, 
-        media: List[Any], 
-        buttons: Optional[List[Dict[str, str]]],
-        platform: str
-    ) -> None:
-        """Log comprehensive media scenario information"""
-        # Default values if not provided in context
-        step_id = "unknown_step"  
-        step_type = "unknown"
-        
-        # Prepare media item information
-        media_items = []
-        for m in media:
-            media_items.append({
-                "file_id": getattr(m, 'file_id', 'unknown') if hasattr(m, 'file_id') else m.get('file_id', 'unknown'),
-                "type": getattr(m, 'type', 'unknown') if hasattr(m, 'type') else m.get('type', 'unknown'),
-                "description": getattr(m, 'description', '') if hasattr(m, 'description') else m.get('description', '')
-            })
-        
-        # Log the comprehensive scenario information
-        self.logger.media_scenario(
-            step_id,
-            len(media),
-            {
-                "media_items": media_items,
-                "step_type": step_type,
-                "has_buttons": buttons is not None,
-                "button_count": len(buttons) if buttons else 0,
-                "platform": platform
-            }
-        )
-        
-    async def _process_media_sending(
-        self, 
-        adapter: PlatformAdapter,
-        chat_id: str,
-        media: List[Any],
-        message_text: str,
-        buttons: Optional[List[Dict[str, str]]],
-        platform: str
-    ) -> Dict[str, Any]:
-        """Process and send media messages, handling multiple media items
-        
-        Args:
-            adapter: The platform adapter to use for sending
-            chat_id: The platform chat ID to send to
-            media: List of media items to send
-            message_text: Text message or caption
-            buttons: Optional list of buttons to include
-            platform: Platform identifier (telegram, whatsapp, etc.)
-            
-        Returns:
-            Dict with success status and response information
-        """
-        # Handle case with no media items
-        if not media or len(media) == 0:
-            return await self._send_text_only_message(adapter, chat_id, message_text, buttons)
-        
-        # Log the media processing
-        self._log_media_processing_start(media, platform, buttons)
-        
-        # Send multiple media items as a group
-        if len(media) > 1:
-            return await self._send_media_group(adapter, chat_id, media, message_text, buttons, platform)
-        
-        # Handle single media item
-        return await self._send_single_media_item(adapter, chat_id, media[0], message_text, buttons, platform)
-    
-    async def _send_text_only_message(
-        self,
-        adapter: PlatformAdapter,
-        chat_id: str,
-        text: str,
-        buttons: Optional[List[Dict[str, str]]]
-    ) -> Dict[str, Any]:
-        """Send a text-only message with optional buttons"""
-        self.logger.debug(LogEventType.MEDIA, "No media items to send, using text message")
-        if buttons:
-            return await adapter.send_buttons(
-                chat_id=chat_id,
-                text=text,
-                buttons=buttons
-            )
-        else:
-            return await adapter.send_text_message(
-                chat_id=chat_id,
-                text=text
-            )
-    
-    def _log_media_processing_start(self, media: List[Any], platform: str, buttons: Optional[List[Dict[str, str]]]):
-        """Log information about media processing at the start"""
-        self.logger.info(LogEventType.MEDIA, f"Processing {len(media)} media item(s)", {
-            "media_count": len(media),
-            "platform": platform,
-            "has_buttons": buttons is not None and len(buttons) > 0,
-            "media_types": [item.get('type', 'unknown') if isinstance(item, dict) else getattr(item, 'type', 'unknown') for item in media]
-        })
-    
-    async def _send_media_group(
-        self, 
-        adapter: PlatformAdapter,
-        chat_id: str,
-        media: List[Any],
-        message_text: str,
-        buttons: Optional[List[Dict[str, str]]],
-        platform: str
-    ) -> Dict[str, Any]:
-        """Send multiple media items as a group with optional follow-up buttons"""
-        self.logger.info(LogEventType.MEDIA, f"Processing {len(media)} media items as a group", {
-            "media_count": len(media),
-            "platform": platform,
-            "has_buttons": buttons is not None and len(buttons) > 0,
-            "media_types": [item.get('type', 'unknown') if isinstance(item, dict) else getattr(item, 'type', 'unknown') for item in media]
-        })
-        
-        # Pre-check validation for media items
-        valid_media = self._validate_media_items(media)
-        if not valid_media:
-            self.logger.error(LogEventType.ERROR, "No valid media items found in group")
-            return {"success": False, "error": "No valid media items"}
-        
-        try:
-            # Detailed timing and tracking
-            start_time = datetime.now()
-            self.logger.debug(LogEventType.MEDIA, "Sending media group to adapter")
-            
-            # Send the media as a group
-            result = await adapter.send_media_group(
-                chat_id=chat_id,
-                media_items=media,
-                caption=message_text
-            )
-            
-            # Calculate and log processing time
-            processing_time = (datetime.now() - start_time).total_seconds() * 1000  # ms
-            self.logger.debug(LogEventType.MEDIA, f"Media group send completed in {processing_time:.2f}ms", {
-                "success": result.get("success", False),
-                "processing_time_ms": processing_time,
-                "message_ids": result.get("message_ids", [])
-            })
-            
-            # Enhanced error handling for failed send operations
-            if not result.get("success", False):
-                error_detail = result.get("error", "Unknown error")
-                self.logger.error(LogEventType.ERROR, f"Media group send failed: {error_detail}", {
-                    "error": error_detail,
-                    "error_code": result.get("error_code"),
-                    "platform": platform
-                })
-                # Continue with fallback strategy
-                self.logger.warning(LogEventType.MEDIA, "Falling back to sending first media item only")
-                return await self._send_single_media_item(adapter, chat_id, media[0], message_text, buttons, platform)
-            
-            # If buttons are provided and media send was successful, send them as follow-up
-            if buttons and result.get("success", True):
-                await self._send_follow_up_buttons(adapter, chat_id, message_text, buttons, result)
-            
-            return result
-            
-        except Exception as e:
-            self.logger.error(LogEventType.ERROR, f"Failed to send media group: {str(e)}", {
-                "exception": str(e),
-                "exception_type": type(e).__name__,
-                "platform": platform,
-                "chat_id": chat_id,
-                "media_count": len(media)
-            }, exc_info=e)
-            self.logger.warning(LogEventType.MEDIA, "Exception during media group send, falling back to single media item")
-            # Fall back to sending just the first media item
-            try:
-                return await self._send_single_media_item(adapter, chat_id, media[0], message_text, buttons, platform)
-            except Exception as fallback_error:
-                self.logger.error(LogEventType.ERROR, f"Fallback strategy also failed: {str(fallback_error)}")
-                # Ultimate fallback: send text only
-                return await self._send_text_only_message(adapter, chat_id, message_text, buttons)
-    
-    async def _send_follow_up_buttons(
-        self,
-        adapter: PlatformAdapter,
-        chat_id: str,
-        message_text: str,
-        buttons: List[Dict[str, str]],
-        result: Dict[str, Any]
-    ) -> None:
-        """Send buttons as a follow-up message after sending media"""
-        self.logger.info(LogEventType.MEDIA, "Sending buttons as follow-up after media group", {
-            "button_count": len(buttons),
-            "button_texts": [btn.get("text", "") for btn in buttons[:5]] + (["..."] if len(buttons) > 5 else []),
-            "chat_id": chat_id,
-            "media_message_ids": result.get("message_ids", [])
-        })
-        
-        # For follow-up buttons after media group, use minimal text to avoid duplication
-        # Since the media group already shows the full message as caption
-        button_text = "Выберите вариант:" if message_text and message_text.strip() else "Please select an option:"
-        
-        try:
-            # Track timing for performance monitoring
-            start_time = datetime.now()
-            
-            button_result = await adapter.send_buttons(
-                chat_id=chat_id,
-                text=button_text,
+                platform_chat_id=platform_chat_id,
+                message=message,
                 buttons=buttons
             )
             
-            # Calculate processing time
-            processing_time = (datetime.now() - start_time).total_seconds() * 1000  # ms
-            
-            # Log button send result
-            if button_result.get("success", False):
-                self.logger.debug(LogEventType.MEDIA, "Successfully sent follow-up buttons", {
-                    "processing_time_ms": processing_time,
-                    "button_message_id": button_result.get("message_id"),
-                    "success": True
-                })
+            # Return success status
+            if isinstance(result, dict):
+                return result.get("success", True)
             else:
-                self.logger.warning(LogEventType.ERROR, "Failed to send follow-up buttons", {
-                    "error": button_result.get("error", "Unknown error"),
-                    "error_code": button_result.get("error_code"),
-                    "processing_time_ms": processing_time
-                })
-            
-            # Add button result to main result
-            result["buttons_sent"] = button_result.get("success", False)
-            result["button_message_id"] = button_result.get("message_id")
-            
-        except Exception as e:
-            self.logger.error(LogEventType.ERROR, f"Error sending follow-up buttons: {str(e)}", {
-                "exception": str(e),
-                "exception_type": type(e).__name__,
-                "chat_id": chat_id,
-                "button_count": len(buttons)
-            })
-            
-            # Update result to reflect button failure
-            result["buttons_sent"] = False
-            result["button_error"] = str(e)
-    
-    async def _send_single_media_item(
-        self,
-        adapter: PlatformAdapter,
-        chat_id: str,
-        media_item: Any,
-        message_text: str,
-        buttons: Optional[List[Dict[str, str]]],
-        platform: str
-    ) -> Dict[str, Any]:
-        """Send a single media item with optional buttons"""
-        # Extract media type and file_id
-        media_type, file_id = self._extract_media_info(media_item)
-        
-        self.logger.info(LogEventType.MEDIA, f"Processing single media item: {media_type} with file_id {file_id}", {
-            "media_type": media_type,
-            "file_id": file_id,
-            "platform": platform,
-            "has_buttons": buttons is not None and len(buttons) > 0
-        })
-        
-        # Use appropriate send method based on whether buttons are included
-        if buttons:
-            return await self._send_media_with_buttons(adapter, chat_id, media_type, file_id, message_text, buttons)
-        else:
-            return await self._send_media_without_buttons(adapter, chat_id, media_type, file_id, message_text)
-    
-    def _extract_media_info(self, media_item: Any) -> Tuple[str, str]:
-        """Extract media type and file_id from a media item"""
-        if hasattr(media_item, 'type'):  # It's a Pydantic object
-            media_type = getattr(media_item, 'type', 'image')  # Default to image
-            file_id = getattr(media_item, 'file_id', None)
-        else:  # It's a dictionary
-            media_type = media_item.get('type', 'image')  # Default to image
-            file_id = media_item.get('file_id')
-            
-        return media_type, file_id
-    
-    async def _send_media_with_buttons(
-        self,
-        adapter: PlatformAdapter,
-        chat_id: str,
-        media_type: str,
-        file_id: str,
-        message_text: str,
-        buttons: List[Dict[str, str]]
-    ) -> Dict[str, Any]:
-        """Send a media item with buttons"""
-        self.logger.debug(LogEventType.MEDIA, f"Sending {media_type} with buttons", {
-            "media_type": media_type,
-            "file_id": file_id[:15] + "..." if len(file_id) > 15 else file_id,
-            "button_count": len(buttons),
-            "chat_id": chat_id,
-            "caption_length": len(message_text) if message_text else 0
-        })
-        
-        try:
-            # Track timing for performance monitoring
-            start_time = datetime.now()
-            
-            result = await adapter.send_media_with_buttons(
-                chat_id=chat_id,
-                media_type=media_type,
-                file_path=file_id,  # Adapter will handle retrieval
-                caption=message_text,
-                buttons=buttons
-            )
-            
-            # Calculate processing time
-            processing_time = (datetime.now() - start_time).total_seconds() * 1000  # ms
-            
-            if result.get("success", False):
-                self.logger.debug(LogEventType.MEDIA, f"Successfully sent {media_type} with buttons", {
-                    "processing_time_ms": processing_time,
-                    "message_id": result.get("message_id"),
-                    "media_type": media_type
-                })
-            else:
-                self.logger.error(LogEventType.ERROR, f"Failed to send {media_type} with buttons", {
-                    "error": result.get("error", "Unknown error"),
-                    "error_code": result.get("error_code"),
-                    "media_type": media_type
-                })
+                return True
                 
-            return result
-            
         except Exception as e:
-            self.logger.error(LogEventType.ERROR, f"Error sending media with buttons: {str(e)}", {
-                "exception": str(e),
-                "exception_type": type(e).__name__,
-                "media_type": media_type,
-                "file_id": file_id[:15] + "..." if len(file_id) > 15 else file_id,
-            }, exc_info=e)
-            
-            self.logger.warning(LogEventType.MEDIA, f"Falling back to text message with buttons due to {type(e).__name__}")
-            
-            try:
-                # Fallback to text message with buttons
-                return await adapter.send_buttons(
-                    chat_id=chat_id,
-                    text=f"[Media unavailable] {message_text}",  # Indicate media failed to send
-                    buttons=buttons
-                )
-            except Exception as fallback_error:
-                # Handle fallback error with comprehensive logging
-                self.logger.error(LogEventType.ERROR, f"Fallback to text also failed: {str(fallback_error)}", {
-                    "original_error": str(e),
-                    "fallback_error": str(fallback_error),
-                    "chat_id": chat_id
-                })
-                return {"success": False, "error": f"Media send failed and fallback failed: {str(fallback_error)}"}
-    
-    async def _send_media_without_buttons(
-        self,
-        adapter: PlatformAdapter,
-        chat_id: str,
-        media_type: str,
-        file_id: str,
-        message_text: str
-    ) -> Dict[str, Any]:
-        """Send a media item without buttons"""
-        try:
-            return await adapter.send_media_message(
-                chat_id=chat_id,
-                media_type=media_type,
-                file_path=file_id,  # Adapter will handle retrieval
-                caption=message_text
-            )
-        except Exception as e:
-            self.logger.error(LogEventType.ERROR, f"Error sending media message: {str(e)}", exc_info=e)
-            self.logger.warning(LogEventType.MEDIA, "Falling back to text message")
-            return await adapter.send_text_message(
-                chat_id=chat_id,
-                text=message_text
-            )
+            self.logger.error(LogEventType.ERROR, f"Error sending message: {str(e)}")
+            return False
         
-    
     # Removed skip_logging functionality as we want to always log all messages
-            
-            
     async def _process_auto_next_step(
         self,
         bot_id: UUID,
