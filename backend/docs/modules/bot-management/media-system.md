@@ -10,21 +10,22 @@ The media system uses a clean, layered architecture with clear separation of con
 
 ### Core Components
 
-1. **DialogManager Layer**: Handles high-level message processing and routing with dedicated methods for different media scenarios
-2. **Platform Adapter Layer**: Provides platform-specific implementations for media delivery
-3. **Validation & Error Handling Layer**: Ensures robustness with comprehensive validation and graceful fallbacks
-4. **Logging Layer**: Provides detailed insights across all operations for monitoring and debugging
+1. **DialogManager Layer**: Handles high-level conversation orchestration and coordinates with MediaManager
+2. **MediaManager Layer**: Dedicated component for all media processing, validation, and delivery (extracted from DialogManager)
+3. **Platform Adapter Layer**: Provides platform-specific implementations for media delivery
+4. **Input Validation Layer**: Ensures user inputs are valid and handles media-related button validation
+5. **Logging Layer**: Provides detailed insights across all operations for monitoring and debugging
 
-### Dialog Manager Media Processing Modules
+### MediaManager Processing Modules
 
-The dialog manager uses a modular architecture with specialized methods:
+The MediaManager uses a specialized architecture with focused methods:
 
-- `_process_media_sending`: Main coordinator that routes media requests based on content
+- `process_message_sending`: Main coordinator that routes media requests based on content
 - `_send_media_group`: Handles groups of multiple media items
 - `_send_single_media_item`: Processes individual media items
 - `_send_media_with_buttons`: Specialized handler for media with interactive buttons
 - `_send_follow_up_buttons`: Manages button messages that follow media content
-- `_validate_media_items`: Ensures media content meets requirements before processing
+- `_validate_media_content`: Ensures media content meets requirements before processing
 
 This modular approach enables better:
 - **Maintainability**: Each function has a single responsibility

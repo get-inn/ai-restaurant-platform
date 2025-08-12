@@ -15,7 +15,9 @@ The bot management system consists of several key components organized in a laye
 
 ```
 ├── Core Bot Management (src/bot_manager/)
-│   ├── dialog_manager.py      # Main conversation orchestrator
+│   ├── dialog_manager.py      # Main conversation orchestrator (882 lines, -37%)
+│   ├── media_manager.py       # Media processing component (537 lines, NEW)
+│   ├── input_validator.py     # Input validation system (358 lines, NEW)
 │   ├── scenario_processor.py  # Scenario logic processing
 │   ├── state_repository.py    # State persistence layer
 │   └── conversation_logger.py # Comprehensive logging system

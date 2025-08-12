@@ -19,6 +19,8 @@ Welcome to the GET INN Restaurant Platform documentation. This repository contai
 #### Bot Management
 - [Overview](modules/bot-management/overview.md) - Comprehensive bot management system overview and architecture
 - [MediaManager](modules/bot-management/media-manager.md) - Dedicated media processing component (NEW)
+- [Input Validation Overview](modules/bot-management/input-validation-overview.md) - User-friendly overview of input validation features (NEW)
+- [Input Validation Spec](modules/bot-management/input-validation-spec.md) - Technical specification for input validation system (NEW)
 - [Refactoring Plan](modules/bot-management/refactoring-plan.md) - System refactoring achievements and status
 - [API Reference](modules/bot-management/api-reference.md) - Complete API documentation for bot management
 - [Scenario Format](modules/bot-management/scenario-format.md) - Bot scenario specification and examples
@@ -46,6 +48,7 @@ The bot management system has undergone comprehensive refactoring with significa
 
 - ✅ **MediaManager Extraction**: Dedicated media processing component extracted from DialogManager
 - ✅ **Code Reduction**: DialogManager reduced by 37% (1,403 → 882 lines)
+- ✅ **Input Validation System**: Comprehensive validation preventing duplicate clicks and invalid inputs with Redis-backed rate limiting
 - ✅ **Shared Utilities**: Permission system, error handlers, and validation utilities eliminate 200+ lines of duplicate code
 - ✅ **Enhanced Architecture**: Better separation of concerns and improved maintainability
 - ✅ **Production Stability**: All critical bugs fixed and full test coverage maintained

@@ -12,6 +12,7 @@ Before adding bot features, you should be familiar with:
 
 - [Bot Management Overview](../modules/bot-management/overview.md)
 - [Bot Scenario Format](../modules/bot-management/scenario-format.md)
+- [Input Validation Overview](../modules/bot-management/input-validation-overview.md)
 - [Webhook Management](../modules/bot-management/webhook-management.md)
 
 ## Types of Bot Features

@@ -26,7 +26,10 @@ Comprehensive media handling for images, videos, documents, and other file types
 ### 6. Auto-Transition System
 Advanced conversation flow control allowing automatic progression through scenario steps with configurable delays and chaining capabilities.
 
-### 7. Conversation Logging
+### 7. Input Validation System
+Comprehensive input validation prevents duplicate button clicks, validates user inputs, and provides friendly error recovery with rate limiting and state consistency checks.
+
+### 8. Conversation Logging
 Detailed logging system for debugging, monitoring, and analytics with specialized event types and structured data.
 
 ## Architecture Diagram
@@ -44,6 +47,7 @@ graph TB
             BOT_MGR[Bot Manager]
             DIALOG_MGR[Dialog Manager<br/>882 lines ↓37%]
             MEDIA_MGR[Media Manager<br/>537 lines NEW]
+            INPUT_VAL[Input Validator<br/>358 lines NEW]
         end
         
         subgraph "Support Services"
@@ -86,12 +90,17 @@ graph TB
     DIALOG_MGR --> SCENARIO_PROC
     DIALOG_MGR --> AUTO_TRANS
     DIALOG_MGR --> MEDIA_MGR
+    DIALOG_MGR --> INPUT_VAL
     DIALOG_MGR --> STATE_REPO
     DIALOG_MGR --> CONV_LOG
     
     %% MediaManager relationships
     MEDIA_MGR --> PLATFORM_ADAPT
     MEDIA_MGR --> CONV_LOG
+    
+    %% InputValidator relationships
+    INPUT_VAL --> REDIS
+    INPUT_VAL --> CONV_LOG
     
     %% Shared utilities connections
     BOT_MGR --> PERMISSIONS
@@ -470,13 +479,21 @@ The bot management system has undergone comprehensive refactoring to improve mai
 - **Improved error logging** with structured context
 - **Better error messages** for debugging and user experience
 
-#### 4. Architectural Utilities
+#### 4. Input Validation System
+- **Comprehensive validation layer** preventing duplicate button clicks and invalid inputs
+- **Redis-backed duplicate detection** with local cache fallback
+- **Rate limiting** to prevent spam and abuse (30 requests/minute default)
+- **State consistency validation** ensuring dialog integrity
+- **User-friendly error recovery** with helpful correction messages
+- **Production-ready reliability** with graceful error handling
+
+#### 5. Architectural Utilities
 - **BaseService class** providing common CRUD operations
 - **Shared validation utilities** consolidating validation patterns
 - **User helper functions** eliminating duplicate user profile access
 - **Error context managers** for better error handling
 
-#### 5. Code Quality Improvements
+#### 6. Code Quality Improvements
 - **Reduced code duplication by 80%+**
 - **Improved separation of concerns** across components
 - **Better testability** with isolated, focused components
@@ -493,11 +510,14 @@ The refactoring successfully addressed:
 
 ### Production Stability
 
-Recent fixes include:
+Recent fixes and improvements include:
 - ✅ **MediaManager interface alignment** with TelegramAdapter
 - ✅ **Method signature corrections** for platform compatibility
 - ✅ **Complete test coverage** for media functionality
 - ✅ **Production bot functionality** fully restored
+- ✅ **Input validation system** preventing user interaction issues
+- ✅ **Duplicate click prevention** ensuring scenario integrity
+- ✅ **Rate limiting** preventing abuse and spam
 
 ## Future Considerations
 

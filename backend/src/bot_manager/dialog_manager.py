@@ -31,6 +31,7 @@ from src.bot_manager.scenario_processor import ScenarioProcessor
 from src.bot_manager.state_repository import StateRepository
 from src.bot_manager.conversation_logger import get_logger, LogEventType, _thread_local, ConversationLogger
 from src.bot_manager.media_manager import MediaManager
+from src.bot_manager.input_validator import InputValidator, ValidationContext, InputType, ValidationResult
 from src.integrations.platforms.base import PlatformAdapter
 
 
@@ -46,7 +47,8 @@ class DialogManager:
         platform_adapters: Dict[str, PlatformAdapter] = None,
         state_repository: StateRepository = None,
         scenario_processor: ScenarioProcessor = None,
-        media_manager: MediaManager = None
+        media_manager: MediaManager = None,
+        redis_client=None
     ):
         """
         Initialize the dialog manager.
@@ -57,6 +59,7 @@ class DialogManager:
             state_repository: Optional custom state repository
             scenario_processor: Optional custom scenario processor
             media_manager: Optional custom media manager
+            redis_client: Optional Redis client for input validation
         """
         self.db = db
         self.platform_adapters = platform_adapters or {}
@@ -65,6 +68,8 @@ class DialogManager:
         self.logger = get_logger()
         # MediaManager will be initialized per conversation context
         self._media_manager_class = media_manager.__class__ if media_manager else MediaManager
+        # Initialize input validator
+        self.input_validator = InputValidator(redis_client=redis_client)
     
     def _get_media_manager(self, bot_id: UUID, platform: str, platform_chat_id: str) -> MediaManager:
         """
@@ -87,6 +92,147 @@ class DialogManager:
         )
         
         return self._media_manager_class(conversation_logger)
+    
+    async def _validate_user_input(
+        self,
+        bot_id: UUID,
+        platform: str,
+        platform_chat_id: str,
+        input_type: InputType,
+        input_value: str,
+        dialog_state: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Validate user input and handle invalid inputs with appropriate responses.
+        
+        Returns:
+            None if input is valid and processing should continue,
+            Dict with response info if input is invalid and was handled
+        """
+        # Get current step info for validation
+        current_step = dialog_state.get("current_step", "")
+        expected_buttons = await self._get_expected_buttons_for_step(bot_id, current_step)
+        
+        # Create validation context
+        validation_context = ValidationContext(
+            user_id=platform_chat_id,
+            bot_id=str(bot_id),
+            platform=platform,
+            platform_chat_id=platform_chat_id,
+            input_type=input_type,
+            input_value=input_value,
+            expected_buttons=expected_buttons,
+            current_step=current_step,
+            dialog_state=dialog_state,
+            timestamp=datetime.utcnow()
+        )
+        
+        # Validate input
+        validation_result = await self.input_validator.validate_input(validation_context)
+        
+        if not validation_result.is_valid:
+            return await self._handle_invalid_input(
+                validation_result, platform, platform_chat_id, expected_buttons
+            )
+        
+        return None
+    
+    async def _get_expected_buttons_for_step(
+        self, 
+        bot_id: UUID, 
+        step_id: str
+    ) -> Optional[List[Dict[str, Any]]]:
+        """
+        Get expected buttons for a given scenario step.
+        """
+        try:
+            # Get active scenario
+            active_scenario = await ScenarioService.get_active_scenario(self.db, bot_id)
+            if not active_scenario or not step_id:
+                return None
+            
+            steps = active_scenario.scenario_data.get("steps", {})
+            step_data = None
+            
+            if isinstance(steps, list):
+                for step in steps:
+                    if step.get("id") == step_id:
+                        step_data = step
+                        break
+            elif isinstance(steps, dict):
+                step_data = steps.get(step_id)
+            
+            if not step_data:
+                return None
+            
+            # Extract buttons from step data
+            buttons = step_data.get("buttons")
+            if buttons:
+                return buttons
+            
+            # Check if buttons are in response
+            response = step_data.get("response")
+            if isinstance(response, dict) and "buttons" in response:
+                return response["buttons"]
+            
+            return None
+            
+        except Exception as e:
+            self.logger.error(LogEventType.ERROR, f"Error getting expected buttons: {str(e)}")
+            return None
+    
+    async def _handle_invalid_input(
+        self,
+        validation_result,
+        platform: str,
+        platform_chat_id: str,
+        expected_buttons: Optional[List[Dict[str, Any]]]
+    ) -> Dict[str, Any]:
+        """
+        Handle invalid input by sending appropriate correction message.
+        """
+        adapter = await self.get_platform_adapter(platform)
+        if not adapter:
+            return {"status": "error", "message": "No adapter available"}
+        
+        response_sent = False
+        
+        if validation_result.result == ValidationResult.DUPLICATE:
+            # For duplicates, we might not want to send any response
+            # to avoid spamming the user
+            self.logger.info(LogEventType.PROCESSING, f"Duplicate input detected for {platform_chat_id}")
+            return {"status": "duplicate", "action": "ignored"}
+            
+        elif validation_result.correction_message:
+            # Send correction message
+            if validation_result.suggested_buttons:
+                await adapter.send_buttons(
+                    chat_id=platform_chat_id,
+                    text=validation_result.correction_message,
+                    buttons=validation_result.suggested_buttons
+                )
+                response_sent = True
+            else:
+                await adapter.send_text_message(
+                    chat_id=platform_chat_id,
+                    text=validation_result.correction_message
+                )
+                response_sent = True
+        
+        if validation_result.should_retry_current_step and not response_sent and expected_buttons:
+            # Re-send current step with buttons
+            button_texts = [btn.get('text', btn.get('value', 'Unknown')) for btn in expected_buttons]
+            await adapter.send_buttons(
+                chat_id=platform_chat_id,
+                text=f"Please choose one of these options: {', '.join(button_texts)}",
+                buttons=expected_buttons
+            )
+        
+        return {
+            "status": "invalid_input",
+            "validation_result": validation_result.result.value,
+            "action": "correction_sent"
+        }
         
     async def register_platform_adapter(self, platform: str, adapter: PlatformAdapter) -> bool:
         """Register a platform adapter"""
@@ -263,6 +409,7 @@ class DialogManager:
         # Special handling for command messages (starting with /)
         if text.startswith('/'):
             self.logger.info(LogEventType.PROCESSING, f"Handling command: {text}")
+            # Commands bypass input validation as they can interrupt flows
             return await self.handle_command(
                 bot_id=bot_id,
                 platform=platform,
@@ -270,6 +417,21 @@ class DialogManager:
                 command=text,
                 dialog_state=dialog_state
             )
+        
+        # Validate text input
+        if dialog_state:  # Only validate if we have a dialog state
+            validation_response = await self._validate_user_input(
+                bot_id=bot_id,
+                platform=platform,
+                platform_chat_id=platform_chat_id,
+                input_type=InputType.TEXT_MESSAGE,
+                input_value=text,
+                dialog_state=dialog_state
+            )
+            
+            # If validation failed and was handled, return the validation response
+            if validation_response:
+                return validation_response
         
         # Process through the dialog service
         self.logger.debug(LogEventType.PROCESSING, f"Processing text message through dialog service", {
@@ -444,6 +606,21 @@ class DialogManager:
         Returns:
             Response information or None if no response is required
         """
+        # Validate button input
+        if dialog_state:  # Only validate if we have a dialog state
+            validation_response = await self._validate_user_input(
+                bot_id=bot_id,
+                platform=platform,
+                platform_chat_id=platform_chat_id,
+                input_type=InputType.BUTTON_CLICK,
+                input_value=button_value,
+                dialog_state=dialog_state
+            )
+            
+            # If validation failed and was handled, return the validation response
+            if validation_response:
+                return validation_response
+        
         # Process through the dialog service
         response = await DialogService.process_user_input(
             self.db, bot_id, platform, platform_chat_id, button_value

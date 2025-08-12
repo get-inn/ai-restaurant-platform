@@ -64,10 +64,12 @@ The API layer is built with FastAPI and follows a structured approach:
 
 The bot management system handles chat bot interactions across multiple messaging platforms:
 
-- Dialog management
-- State management
-- Scenario execution
-- Cross-platform adapters
+- Dialog management with comprehensive input validation
+- State management and persistence
+- Scenario execution with media support
+- Cross-platform adapters (Telegram, WhatsApp)
+- Input validation preventing duplicate clicks and invalid inputs
+- Media processing for rich content delivery
 
 ### Integrations (`src/integrations/`)
 
