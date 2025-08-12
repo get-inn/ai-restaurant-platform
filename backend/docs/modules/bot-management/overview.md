@@ -31,30 +31,71 @@ Detailed logging system for debugging, monitoring, and analytics with specialize
 
 ## Architecture Diagram
 
-```
-┌───────────────────────────────────────────────────────────────┐
-│                   Existing GET INN Backend                     │
-└──────────────────────┬────────────────────────────────────────┘
-                       │
-                       │ Direct DB access + API integration
-                       ▼
-┌───────────────────────────────────────────────────────────────┐
-│                     Bot Management System                     │
-│                                                               │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐     │
-│  │  Bot Manager │    │Dialog Manager│    │Media Manager │     │
-│  └──────────────┘    └──────────────┘    └──────────────┘     │
-│                                                               │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐     │
-│  │ Platform     │    │ State        │    │ Conversation │     │
-│  │ Adapters     │    │ Repository   │    │ Logger       │     │
-│  └──────────────┘    └──────────────┘    └──────────────┘     │
-└───────────┬──────────────────┬──────────────────┬─────────────┘
-            │                  │                  │
-            ▼                  ▼                  ▼
-┌───────────────┐    ┌───────────────┐    ┌───────────────┐
-│ Telegram API  │    │ WhatsApp API  │    │  Other APIs   │
-└───────────────┘    └───────────────┘    └───────────────┘
+```{mermaid}
+graph TB
+    subgraph "GET INN Backend"
+        BACKEND[GET INN Backend APIs]
+        AUTH[Authentication]
+        DB[(PostgreSQL Database)]
+    end
+    
+    subgraph "Bot Management System"
+        subgraph "Core Components"
+            BOT_MGR[Bot Manager]
+            DIALOG_MGR[Dialog Manager]
+            MEDIA_MGR[Media Manager]
+        end
+        
+        subgraph "Support Services"
+            PLATFORM_ADAPT[Platform Adapters]
+            STATE_REPO[State Repository]
+            CONV_LOG[Conversation Logger]
+        end
+        
+        subgraph "Processing Layer"
+            SCENARIO_PROC[Scenario Processor]
+            AUTO_TRANS[Auto-Transition System]
+        end
+    end
+    
+    subgraph "External Platforms"
+        TELEGRAM[Telegram Bot API]
+        WHATSAPP[WhatsApp Business API]
+        OTHER[Other Messaging APIs]
+    end
+    
+    subgraph "Storage & Cache"
+        REDIS[(Redis Cache)]
+        MEDIA_STORE[Media Storage]
+    end
+    
+    %% Backend connections
+    BACKEND <--> BOT_MGR
+    AUTH --> BOT_MGR
+    DB <--> STATE_REPO
+    
+    %% Core component relationships
+    BOT_MGR --> DIALOG_MGR
+    DIALOG_MGR --> SCENARIO_PROC
+    DIALOG_MGR --> AUTO_TRANS
+    DIALOG_MGR --> MEDIA_MGR
+    DIALOG_MGR --> STATE_REPO
+    DIALOG_MGR --> CONV_LOG
+    
+    %% Platform connections
+    PLATFORM_ADAPT --> TELEGRAM
+    PLATFORM_ADAPT --> WHATSAPP
+    PLATFORM_ADAPT --> OTHER
+    DIALOG_MGR --> PLATFORM_ADAPT
+    
+    %% Storage connections
+    STATE_REPO <--> REDIS
+    MEDIA_MGR <--> MEDIA_STORE
+    
+    %% Webhook flow
+    TELEGRAM -.->|Webhooks| PLATFORM_ADAPT
+    WHATSAPP -.->|Webhooks| PLATFORM_ADAPT
+    OTHER -.->|Webhooks| PLATFORM_ADAPT
 ```
 
 ## Database Schema
@@ -264,25 +305,47 @@ Conversation context persistence:
 - Platform-specific metadata
 - Interaction history
 
-## Platform Integration Architecture
+## Conversation Flow Process
 
+```{mermaid}
+sequenceDiagram
+    participant User
+    participant Platform as Messaging Platform
+    participant Webhook as Webhook Controller
+    participant DialogMgr as Dialog Manager
+    participant ScenarioProc as Scenario Processor
+    participant StateRepo as State Repository
+    participant Logger as Conversation Logger
+    
+    User->>Platform: Send message
+    Platform->>Webhook: Forward update via webhook
+    Webhook->>DialogMgr: Process incoming message
+    
+    DialogMgr->>Logger: Log incoming message
+    DialogMgr->>StateRepo: Get/create dialog state
+    StateRepo-->>DialogMgr: Return current state
+    
+    DialogMgr->>ScenarioProc: Process current step
+    ScenarioProc->>ScenarioProc: Evaluate conditions
+    ScenarioProc->>ScenarioProc: Apply variable substitutions
+    ScenarioProc-->>DialogMgr: Return processed response
+    
+    DialogMgr->>StateRepo: Update dialog state
+    DialogMgr->>Logger: Log processing events
+    
+    DialogMgr->>Platform: Send response message
+    Platform->>User: Deliver response
+    
+    alt Auto-transition enabled
+        DialogMgr->>DialogMgr: Schedule auto-transition
+        Note over DialogMgr: Wait for configured delay
+        DialogMgr->>ScenarioProc: Process next step automatically
+        DialogMgr->>Platform: Send auto-transition message
+        Platform->>User: Deliver automated message
+    end
 ```
-┌───────────────┐    ┌────────────────────┐    ┌────────────────┐
-│ Messaging     │◄───┤ Platform Webhook   │◄───┤ Bot Manager    │
-│ Platforms     │    │ Controllers        │    └────────────────┘
-│ (Telegram,    │    └────────────────────┘           ▲
-│  WhatsApp,    │              ▲                      │
-│  etc.)        │              │                      │
-└───────────────┘     ┌────────────────────┐    ┌────────────────┐
-                      │ Platform Adapters  │◄───┤ Dialog Manager │
-                      └────────────────────┘    └────────────────┘
-                                                      ▲
-                                                      │
-                                               ┌────────────────┐
-                                               │ Dialog State   │
-                                               │ Repository     │
-                                               └────────────────┘
-```
+
+## Platform Integration Architecture
 
 Key principles:
 - Platform-agnostic core system

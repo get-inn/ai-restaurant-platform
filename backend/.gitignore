@@ -112,3 +112,4 @@ telegram_credentials.json
 # Docs
 docs/modules/bot-management/chiho
 docs/archive
+docs/_build

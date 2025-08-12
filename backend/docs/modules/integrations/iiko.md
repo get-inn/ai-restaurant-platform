@@ -96,7 +96,7 @@ The following data entities can be synchronized:
 
 ### Environment Variables
 
-```env
+```bash
 # Optional: Enable/disable all integrations
 INTEGRATIONS_ENABLED=True
 

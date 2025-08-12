@@ -164,30 +164,144 @@ CREATE TABLE getinn_ops.account_integration_credentials (
 
 ## Entity Relationships
 
-### Account-Related Relationships
-
-```
-Account
-│
-├── User (many)
-│   
-├── Restaurant (many)
-│   
-├── BotInstance (many)
-│   
-└── AccountIntegrationCredentials (many)
-```
-
-### Bot Management Relationships
-
-```
-BotInstance
-│
-├── BotPlatformCredential (many)
-│
-├── BotScenario (many)
-│
-└── BotDialogState (many)
+```{mermaid}
+erDiagram
+    ACCOUNT {
+        uuid id PK
+        varchar name
+        text description
+        boolean is_active
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    USER {
+        uuid id PK
+        varchar email UK
+        varchar hashed_password
+        varchar full_name
+        uuid account_id FK
+        boolean is_active
+        boolean is_superuser
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    RESTAURANT {
+        uuid id PK
+        uuid account_id FK
+        varchar name
+        text address
+        varchar phone
+        varchar email
+        varchar timezone
+        boolean is_active
+        varchar iiko_id
+        varchar iiko_sync_status
+        timestamp iiko_last_synced_at
+        varchar iiko_sync_error
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    BOT_INSTANCE {
+        uuid id PK
+        uuid account_id FK
+        varchar name
+        text description
+        boolean is_active
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    BOT_PLATFORM_CREDENTIAL {
+        uuid id PK
+        uuid bot_id FK
+        varchar platform
+        jsonb credentials
+        boolean is_active
+        varchar webhook_url
+        timestamp webhook_last_checked
+        boolean webhook_auto_refresh
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    BOT_SCENARIO {
+        uuid id PK
+        uuid bot_id FK
+        varchar name
+        text description
+        jsonb scenario_data
+        varchar version
+        boolean is_active
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    BOT_DIALOG_STATE {
+        uuid id PK
+        uuid bot_id FK
+        varchar platform
+        varchar platform_chat_id
+        varchar current_step
+        jsonb collected_data
+        timestamp last_interaction_at
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    BOT_DIALOG_HISTORY {
+        uuid id PK
+        uuid dialog_state_id FK
+        varchar message_type
+        jsonb message_data
+        timestamp timestamp
+        timestamp created_at
+    }
+    
+    BOT_MEDIA_FILE {
+        uuid id PK
+        uuid bot_id FK
+        varchar file_type
+        varchar file_name
+        text storage_path
+        varchar storage_type
+        jsonb platform_file_ids
+        varchar content_type
+        integer file_size
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    ACCOUNT_INTEGRATION_CREDENTIALS {
+        uuid id PK
+        uuid account_id FK
+        varchar integration_type
+        jsonb credentials
+        varchar base_url
+        boolean is_active
+        timestamp last_connected_at
+        varchar connection_status
+        varchar connection_error
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    %% Core relationships
+    ACCOUNT ||--o{ USER : "has many"
+    ACCOUNT ||--o{ RESTAURANT : "has many"
+    ACCOUNT ||--o{ BOT_INSTANCE : "has many"
+    ACCOUNT ||--o{ ACCOUNT_INTEGRATION_CREDENTIALS : "has many"
+    
+    %% Bot management relationships
+    BOT_INSTANCE ||--o{ BOT_PLATFORM_CREDENTIAL : "has many"
+    BOT_INSTANCE ||--o{ BOT_SCENARIO : "has many"
+    BOT_INSTANCE ||--o{ BOT_DIALOG_STATE : "has many"
+    BOT_INSTANCE ||--o{ BOT_MEDIA_FILE : "has many"
+    
+    %% Dialog relationships
+    BOT_DIALOG_STATE ||--o{ BOT_DIALOG_HISTORY : "has many"
 ```
 
 ## SQLAlchemy Models
