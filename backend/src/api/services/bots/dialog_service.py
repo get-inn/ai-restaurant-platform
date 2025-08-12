@@ -410,21 +410,40 @@ class DialogService:
             )
             await DialogService.create_dialog_history_entry(db, history_entry)
             
-            # Process the message to replace variables
-            message = step_data.get("message", {})
-            processed_message = DialogService._replace_variables(message, {}, scenario.scenario_data)
+            # Use ScenarioProcessor to properly handle all step types including variable mapping
+            from src.bot_manager.scenario_processor import ScenarioProcessor
+            processor = ScenarioProcessor()
             
-            # Get auto_next properties from the step
-            auto_next = step_data.get("auto_next", False)
-            auto_next_delay = step_data.get("auto_next_delay", 1.5)
+            processed_step = processor.process_step(
+                scenario_data=scenario.scenario_data,
+                current_step_id=first_step,
+                collected_data=dialog_state.collected_data
+            )
             
-            return {
-                "message": processed_message,
-                "buttons": step_data.get("buttons", []),
-                "next_step": step_data.get("next_step"),
-                "auto_next": auto_next,
-                "auto_next_delay": auto_next_delay
-            }
+            if processed_step.get("error"):
+                logger.error(f"Error processing step '{first_step}': {processed_step['error']}")
+                return None
+                
+            if processed_step.get("message"):
+                return {
+                    "message": processed_step["message"],
+                    "buttons": processed_step.get("buttons", []),
+                    "next_step": processed_step.get("next_step_id"),
+                    "auto_next": processed_step.get("auto_next", False),
+                    "auto_next_delay": processed_step.get("auto_next_delay", 1.5)
+                }
+            else:
+                # Fallback for when no message is generated
+                message = step_data.get("message", {})
+                processed_message = DialogService._replace_variables(message, dialog_state.collected_data, scenario.scenario_data)
+                
+                return {
+                    "message": processed_message,
+                    "buttons": step_data.get("buttons", []),
+                    "next_step": step_data.get("next_step"),
+                    "auto_next": step_data.get("auto_next", False),
+                    "auto_next_delay": step_data.get("auto_next_delay", 1.5)
+                }
         else:
             # Existing dialog, process based on current state
             # This is where the main scenario processing logic would go
