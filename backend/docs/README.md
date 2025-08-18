@@ -21,6 +21,8 @@ Welcome to the GET INN Restaurant Platform documentation. This repository contai
 - [MediaManager](modules/bot-management/media-manager.md) - Dedicated media processing component (NEW)
 - [Input Validation Overview](modules/bot-management/input-validation-overview.md) - User-friendly overview of input validation features (NEW)
 - [Input Validation Spec](modules/bot-management/input-validation-spec.md) - Technical specification for input validation system (NEW)
+- [Menu Navigation Spec](modules/bot-management/menu-navigation-spec.md) - Technical specification for menu navigation system (NEW)
+- [Intent-Based Scenarios Spec](modules/bot-management/intent-based-scenarios-spec.md) - Technical specification for splitting scenarios into logical intents (NEW)
 - [Refactoring Plan](modules/bot-management/refactoring-plan.md) - System refactoring achievements and status
 - [API Reference](modules/bot-management/api-reference.md) - Complete API documentation for bot management
 - [Scenario Format](modules/bot-management/scenario-format.md) - Bot scenario specification and examples

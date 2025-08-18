@@ -1,0 +1,74 @@
+{
+  "package_name": "chiho_onboarding_intents",
+  "version": "1.5.0",
+  "description": "ChiHo onboarding bot converted to intent-based architecture from monolithic scenario",
+  "bot_compatibility": ["onboarding_bot", "general_bot"],
+  "dependencies": {
+    "external_packages": [],
+    "system_requirements": ["input_validation", "media_manager"]
+  },
+  "deployment_order": [
+    "navigation/main_menu_intent.json",
+    "navigation/menu_display_intents.json",
+    "core/welcome_intent.json",
+    "core/user_registration_intent.json",
+    "core/data_confirmation_intent.json",
+    "core/first_day_preparation_intent.json",
+    "information/company_ideology_intent.json",
+    "information/work_conditions_intent.json",
+    "information/responsibilities_intent.json",
+    "information/motivation_program_intent.json",
+    "information/medical_book_intent.json",
+    "information/office_structure_intent.json",
+    "support/contacts_intent.json",
+    "support/help_support_intent.json",
+    "core/onboarding_completion_intent.json"
+  ],
+  "activation_groups": {
+    "essential": ["welcome", "user_registration", "data_confirmation", "main_menu"],
+    "core": ["welcome", "user_registration", "data_confirmation", "first_day_preparation", "onboarding_completion"],
+    "information": ["company_ideology", "work_conditions", "responsibilities", "motivation_program", "medical_book", "office_structure"],
+    "support": ["contacts", "help_support"],
+    "navigation": ["main_menu", "menu_displays"],
+    "all": ["welcome", "user_registration", "data_confirmation", "first_day_preparation", "company_ideology", "work_conditions", "responsibilities", "motivation_program", "medical_book", "office_structure", "contacts", "help_support", "main_menu", "menu_displays", "onboarding_completion"]
+  },
+  "variables_mapping": {
+    "position": {
+      "food-guide": "Фуд-гид",
+      "cook": "Повар",
+      "manager": "Менеджер",
+      "office": "Я из офиса 🤓"
+    },
+    "project": {
+      "pyatnitskaya": "Пятницкая",
+      "pushkinskaya": "Пушкинская",
+      "myasnitskaya": "Мясницкая",
+      "cv_aviapark": "ЦВ Авиапарк",
+      "cr_artplay": "ЦР Артплей",
+      "novoslobodskaya": "Новослободская",
+      "belorusskaya": "Белорусская",
+      "city1": "Сити 1",
+      "city2": "Сити 2",
+      "sretenka": "Сретенка",
+      "ko_pokrovka": "КО Покровка"
+    },
+    "citizenship": {
+      "rf": "РФ",
+      "cis": "СНГ"
+    },
+    "data_confirmed": {
+      "yes": "Да",
+      "no": "Нет"
+    }
+  },
+  "global_context": {
+    "brand_name": "ЧиХо",
+    "bot_name": "ЧиХо",
+    "company_greeting": "Нихао 你好",
+    "support_contacts": {
+      "td_head": "Аня Бондарева (@bondy_anna)",
+      "td_manager": "Рита Тер-Ованесян (@Rita0a0a0a)",
+      "general_chat": "https://t.me/+6-KZ97B98Tg2MjQy"
+    }
+  }
+}

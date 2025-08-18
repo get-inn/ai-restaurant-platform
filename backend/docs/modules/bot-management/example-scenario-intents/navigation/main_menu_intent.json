@@ -1,0 +1,69 @@
+{
+  "intent_id": "main_menu",
+  "intent_name": "Main Navigation Menu",
+  "intent_type": "navigation",
+  "version": "1.0",
+  "dependencies": [],
+  "entry_points": ["menu", "from_onboarding", "from_any_intent"],
+  "exit_points": ["navigate_to_intent"],
+  "context_requirements": {
+    "user_profile": "optional",
+    "onboarding_status": "any"
+  },
+  "start_step": "menu",
+  "steps": {
+    "menu": {
+      "id": "menu",
+      "type": "message",
+      "message": {
+        "text": "Главное меню"
+      },
+      "buttons": [
+        {"text": "🏮 Идеология", "value": "ideology"},
+        {"text": "📋 Условия работы", "value": "work_conditions_menu"},
+        {"text": "💪 Обязанности", "value": "duties"},
+        {"text": "💰 Мотивационная программа", "value": "motivation"},
+        {"text": "📞 Контакты", "value": "contacts"},
+        {"text": "🏢 Оргструктура офиса", "value": "office_structure"},
+        {"text": "🆘 Поддержка", "value": "support"}
+      ],
+      "expected_input": {
+        "type": "button",
+        "variable": "menu_choice"
+      },
+      "next_step": {
+        "type": "conditional",
+        "conditions": [
+          {
+            "if": "menu_choice == 'ideology'",
+            "then": "intent://navigation/menu_displays/menu_ideology_display"
+          },
+          {
+            "if": "menu_choice == 'work_conditions_menu'",
+            "then": "intent://navigation/menu_displays/menu_work_conditions_display"
+          },
+          {
+            "if": "menu_choice == 'duties'",
+            "then": "intent://navigation/menu_displays/menu_duties_display"
+          },
+          {
+            "if": "menu_choice == 'motivation'",
+            "then": "intent://navigation/menu_displays/menu_motivation_display"
+          },
+          {
+            "if": "menu_choice == 'contacts'",
+            "then": "intent://support/contacts/menu_contacts"
+          },
+          {
+            "if": "menu_choice == 'office_structure'",
+            "then": "intent://navigation/menu_displays/menu_office_structure_display"
+          },
+          {
+            "if": "menu_choice == 'support'",
+            "then": "intent://support/help_support/menu_support"
+          }
+        ]
+      }
+    }
+  }
+}

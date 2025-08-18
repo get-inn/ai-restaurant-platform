@@ -394,7 +394,11 @@ class MediaManager:
                 buttons
             )
             
-            self.logger.info("BUTTON_FOLLOWUP", "Follow-up buttons sent successfully")
+            if result.get("success", True):
+                self.logger.info("BUTTON_FOLLOWUP", "Follow-up buttons sent successfully")
+            else:
+                self.logger.error("BUTTON_FOLLOWUP", f"Failed to send follow-up buttons: {result.get('error', 'Unknown error')}")
+            
             return result
         except Exception as e:
             self.logger.error("BUTTON_FOLLOWUP", f"Error sending follow-up buttons: {str(e)}", exc_info=True)
@@ -439,7 +443,7 @@ class MediaManager:
                 # Send buttons as follow-up if present
                 if buttons:
                     button_result = await self.send_follow_up_buttons(
-                        adapter, platform_chat_id, buttons
+                        adapter, platform_chat_id, buttons, "👆"
                     )
                     results.append(button_result)
             else:
@@ -521,17 +525,31 @@ class MediaManager:
                 )
             
             else:
-                # Multiple media items
-                results = await self.send_media_group(
-                    adapter, platform_chat_id, media_items, buttons
-                )
+                # Multiple media items - send text first, then media group, then buttons
+                results = []
                 
-                # Send text separately if present and not used as caption
+                # Send text first if present
                 if text_content:
                     text_result = await self.send_text_only_message(
                         adapter, platform_chat_id, text_content
                     )
                     results.append(text_result)
+                
+                # Then send media group without buttons (buttons will be sent separately after)
+                media_results = await self.send_media_group(
+                    adapter, platform_chat_id, media_items, None
+                )
+                if isinstance(media_results, list):
+                    results.extend(media_results)
+                else:
+                    results.append(media_results)
+                
+                # Finally send buttons separately if present
+                if buttons:
+                    button_result = await self.send_follow_up_buttons(
+                        adapter, platform_chat_id, buttons, "👆"
+                    )
+                    results.append(button_result)
                 
                 return {
                     'type': 'media_group',

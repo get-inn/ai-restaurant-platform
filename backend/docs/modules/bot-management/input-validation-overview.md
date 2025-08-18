@@ -113,6 +113,8 @@ For more detailed information about the bot management system and input validati
 
 - **[Bot Management Overview](overview.md)** - Complete system architecture and components
 - **[Input Validation Technical Spec](input-validation-spec.md)** - Detailed implementation specification
+- **[Menu Navigation Spec](menu-navigation-spec.md)** - Menu system that works with input validation
+- **[Intent-Based Scenarios Spec](intent-based-scenarios-spec.md)** - Modular scenarios that leverage input validation
 - **[Refactoring Plan](refactoring-plan.md)** - Implementation status and achievements
 - **[MediaManager](media-manager.md)** - Media processing component that works with input validation
 - **[Scenario Format](scenario-format.md)** - How to define scenarios with proper button validation

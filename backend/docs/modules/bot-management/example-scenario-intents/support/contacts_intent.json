@@ -1,0 +1,31 @@
+{
+  "intent_id": "contacts",
+  "intent_name": "Contact Information",
+  "intent_type": "support",
+  "version": "1.0",
+  "dependencies": ["main_menu"],
+  "entry_points": ["menu_contacts", "from_menu"],
+  "exit_points": ["return_to_menu"],
+  "context_requirements": {
+    "user_profile": "optional",
+    "onboarding_status": "any"
+  },
+  "start_step": "menu_contacts",
+  "steps": {
+    "menu_contacts": {
+      "id": "menu_contacts",
+      "type": "message",
+      "message": {
+        "text": "📚 Руководитель T&D: Аня Бондарева (@bondy_anna)\n📚 Менеджер T&D: Рита Тер-Ованесян (@Rita0a0a0a)\n👥 Общий чат Чихо: https://t.me/+6-KZ97B98Tg2MjQy"
+      },
+      "buttons": [
+        {"text": "⬅️ Главное меню", "value": "back_to_menu"}
+      ],
+      "expected_input": {
+        "type": "button",
+        "variable": "user_action"
+      },
+      "next_step": "intent://navigation/main_menu/menu"
+    }
+  }
+}

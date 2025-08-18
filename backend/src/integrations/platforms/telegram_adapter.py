@@ -159,6 +159,7 @@ class TelegramAdapter(PlatformAdapter):
             "text_length": len(text)
         })
         
+        response = None
         try:
             # Configure httpx with increased timeout and retry settings
             async with httpx.AsyncClient(timeout=30.0) as client:
@@ -199,21 +200,6 @@ class TelegramAdapter(PlatformAdapter):
                             # We've exhausted our retries, re-raise the exception
                             raise
                 
-                if response.status_code != 200:
-                    error_msg = response.text
-                    logger.error(LogEventType.ERROR, f"Failed to send text message: API returned {response.status_code}", {
-                        "status_code": response.status_code,
-                        "error": error_msg[:200] if len(error_msg) > 200 else error_msg
-                    })
-                    return {"success": False, "error": error_msg}
-                
-                result = response.json().get("result")
-                logger.debug(LogEventType.ADAPTER, "Text message sent successfully", {
-                    "message_id": result.get("message_id") if result else None,
-                    "chat_id": chat_id
-                })
-                return {"success": True, "result": result}
-                
         except httpx.ConnectTimeout:
             logger.error(LogEventType.ERROR, "Connection timeout while sending text message to Telegram API after retries", {
                 "chat_id": chat_id,
@@ -229,6 +215,26 @@ class TelegramAdapter(PlatformAdapter):
                 "chat_id": chat_id
             })
             return {"success": False, "error": f"Exception: {str(e)}"}
+        
+        # Check if we got a response
+        if response is None:
+            logger.error(LogEventType.ERROR, "No response received from Telegram API")
+            return {"success": False, "error": "No response received"}
+            
+        if response.status_code != 200:
+            error_msg = response.text
+            logger.error(LogEventType.ERROR, f"Failed to send text message: API returned {response.status_code}", {
+                "status_code": response.status_code,
+                "error": error_msg[:200] if len(error_msg) > 200 else error_msg
+            })
+            return {"success": False, "error": error_msg}
+        
+        result = response.json().get("result")
+        logger.debug(LogEventType.ADAPTER, "Text message sent successfully", {
+            "message_id": result.get("message_id") if result else None,
+            "chat_id": chat_id
+        })
+        return {"success": True, "result": result}
     
     async def send_media_message(
         self, 
@@ -453,6 +459,7 @@ class TelegramAdapter(PlatformAdapter):
             "chat_id": chat_id
         })
         
+        response = None
         try:
             # Use a timeout of 30 seconds and configure retries
             async with httpx.AsyncClient(timeout=30.0) as client:
@@ -512,6 +519,11 @@ class TelegramAdapter(PlatformAdapter):
                 "chat_id": chat_id
             })
             return {"success": False, "error": f"Exception: {str(e)}"}
+            
+        # Check if we got a response
+        if response is None:
+            logger.error(LogEventType.ERROR, "No response received from Telegram API")
+            return {"success": False, "error": "No response received"}
             
         if response.status_code != 200:
             logger.error(LogEventType.ERROR, f"Failed to send buttons message: {response.status_code}", {

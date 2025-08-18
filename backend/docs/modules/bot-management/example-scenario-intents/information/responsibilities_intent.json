@@ -1,0 +1,60 @@
+{
+  "intent_id": "responsibilities",
+  "intent_name": "Job Responsibilities and Duties",
+  "intent_type": "information",
+  "version": "1.0",
+  "dependencies": ["main_menu"],
+  "entry_points": ["responsibilities_info", "from_menu", "from_onboarding", "from_work_conditions"],
+  "exit_points": ["return_to_menu", "continue_to_motivation", "continue_onboarding"],
+  "context_requirements": {
+    "user_profile": "optional",
+    "onboarding_status": "any"
+  },
+  "start_step": "responsibilities_info",
+  "steps": {
+    "responsibilities_info": {
+      "id": "responsibilities_info",
+      "type": "message",
+      "message": {
+        "text": "📌 Твои обязанности.",
+        "media": [
+          {
+            "type": "image",
+            "description": "Обязанности фуд-гида детально",
+            "file_id": "chiho-foodguide1"
+          }
+        ]  
+      },
+      "buttons": [
+        {"text": "💪 Я буду лучшим фуд-гидом!", "value": "i_will_be_the_best"}
+      ],
+      "expected_input": {
+        "type": "button",
+        "variable": "responsibilities_accepted"
+      },
+      "next_step": "responsibilities_details"
+    },
+    "responsibilities_details": {
+      "id": "responsibilities_details",
+      "type": "message",
+      "message": {
+        "text": "Твои обязанности можно разделить на первичные и вторичные.\n\nПервичные - обязанности, которые ты должен выполнять каждый день.\n\nВторичные - бонусные задания, которые могут дать управляющие, менеджеры или сотрудники офиса.",
+        "media": [
+          {
+            "type": "image",
+            "description": "Обязанности фуд-гида детально",
+            "file_id": "chiho-foodguide3"
+          }
+        ]  
+      },
+      "buttons": [
+        {"text": "✅ Погнали", "value": "go"}
+      ],
+      "expected_input": {
+        "type": "button",
+        "variable": "continue_to_motivation"
+      },
+      "next_step": "intent://information/motivation_program/motivation_intro"
+    }
+  }
+}

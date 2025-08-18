@@ -1,0 +1,48 @@
+{
+  "intent_id": "help_support",
+  "intent_name": "Help and Support System",
+  "intent_type": "support",
+  "version": "1.0",
+  "dependencies": ["main_menu"],
+  "entry_points": ["menu_support", "from_menu"],
+  "exit_points": ["return_to_menu", "message_sent"],
+  "context_requirements": {
+    "user_profile": "optional",
+    "onboarding_status": "any"
+  },
+  "start_step": "menu_support",
+  "steps": {
+    "menu_support": {
+      "id": "menu_support",
+      "type": "message",
+      "message": {
+        "text": "Напиши свой вопрос или проблему, и я передам её команде поддержки. Они ответят тебе в личные сообщения или свяжутся другим удобным способом."
+      },
+      "expected_input": {
+        "type": "text",
+        "variable": "support_message",
+        "validation": {
+          "min_length": 5,
+          "max_length": 1000,
+          "error_message": "Пожалуйста, опишите вашу проблему подробнее (минимум 5 символов)"
+        }
+      },
+      "next_step": "support_confirmation"
+    },
+    "support_confirmation": {
+      "id": "support_confirmation",
+      "type": "message",
+      "message": {
+        "text": "Твое сообщение получено и будет передано команде поддержки."
+      },
+      "buttons": [
+        {"text": "⬅️ Главное меню", "value": "back_to_menu"}
+      ],
+      "expected_input": {
+        "type": "button",
+        "variable": "user_action"
+      },
+      "next_step": "intent://navigation/main_menu/menu"
+    }
+  }
+}

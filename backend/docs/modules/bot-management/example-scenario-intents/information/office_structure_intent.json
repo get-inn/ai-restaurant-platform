@@ -1,0 +1,242 @@
+{
+  "intent_id": "office_structure",
+  "intent_name": "Office Structure and Key People",
+  "intent_type": "information",
+  "version": "1.0",
+  "dependencies": ["main_menu"],
+  "entry_points": ["office_structure_info", "from_menu", "from_onboarding", "from_motivation"],
+  "exit_points": ["return_to_menu", "complete_onboarding", "continue_onboarding"],
+  "context_requirements": {
+    "user_profile": "optional",
+    "onboarding_status": "any"
+  },
+  "start_step": "office_staff_intro",
+  "steps": {
+    "office_staff_intro": {
+      "id": "office_staff_intro",
+      "type": "message",
+      "message": {
+        "text": "Вот, кстати, все ребята из офиса. С большей частью из них ты однозначно еще увидишься на проекте, так как они часто приезжают."
+      },
+      "next_step": "key_people_intro",
+      "auto_next": true
+    },
+    "key_people_intro": {
+      "id": "key_people_intro",
+      "type": "message",
+      "message": {
+        "text": "Это наши особо важные ребята. Они приезжают на проекты покушать и посмотреть, как идут дела. Постарайся запомнить их в лицо, чтобы по их приходу на проекте всё было прекрасно. Впрочем, как и всегда.",
+        "media": [
+          {
+            "type": "image",
+            "description": "Особо важные ребята",
+            "file_id": "chiho-vip"
+          }
+        ]  
+      },
+      "buttons": [
+        {"text": "🫡", "value": "salute"}
+      ],
+      "expected_input": {
+        "type": "button",
+        "variable": "vip_acknowledged"
+      },
+      "next_step": "key_people_details"
+    },
+    "key_people_details": {
+      "id": "key_people_details",
+      "type": "message",
+      "message": {
+        "text": "И давай знакомиться с ключевыми сотрудниками офиса. Нажимай '➡', чтобы увидеть всех.",
+        "media": [
+          {
+            "type": "image",
+            "description": "Анна Ячневская",
+            "file_id": "chiho-people1"
+          }
+        ]  
+      },
+      "buttons": [
+        {"text": "➡", "value": "next"}
+      ],
+      "expected_input": {
+        "type": "button",
+        "variable": "next_person"
+      },
+      "next_step": "key_people_details_2"
+    },
+    "key_people_details_2": {
+      "id": "key_people_details_2",
+      "type": "message",
+      "message": {
+        "text": "Николай Акулич.",
+        "media": [
+          {
+            "type": "image",
+            "description": "Николай Акулич",
+            "file_id": "chiho-people2"
+          }
+        ]
+      },
+      "buttons": [
+        {"text": "➡", "value": "next"}
+      ],
+      "expected_input": {
+        "type": "button",
+        "variable": "next_person"
+      },
+      "next_step": "gemba_intro"
+    },
+    "gemba_intro": {
+      "id": "gemba_intro",
+      "type": "message",
+      "message": {
+        "text": "Кстати, для поиска новых идей и для улучшения отношений между офисом и проектами мы устраиваем гемба-менеджмент 1 раз в квартал."
+      },
+      "buttons": [
+        {"text": "🤔 Гемба-менеджмент?..", "value": "what_is_gemba"}
+      ],
+      "expected_input": {
+        "type": "button",
+        "variable": "ask_about_gemba"
+      },
+      "next_step": "gemba_explanation"
+    },
+    "gemba_explanation": {
+      "id": "gemba_explanation",
+      "type": "message",
+      "message": {
+        "text": "Ага, это когда сотрудники офиса приезжают и работают вместе с сотрудниками проектов плечом к плечу.\n\nЦЕЛЬ: познакомиться и поработать с ребятами в «полях», найти интересные идеи по улучшению работы.",
+        "media": [
+          {
+            "type": "image",
+            "description": "Механика проведения гембы",
+            "file_id": "chiho-gemba1"
+          }
+        ]  
+      },
+      "buttons": [
+        {"text": "🔥 Оо, круто", "value": "cool"}
+      ],
+      "expected_input": {
+        "type": "button",
+        "variable": "gemba_acknowledged"
+      },
+      "next_step": "gemba_photos"
+    },
+    "gemba_photos": {
+      "id": "gemba_photos",
+      "type": "message",
+      "message": {
+        "text": "Вот немного фоток с наших гемб.",
+        "media": [
+          {
+            "type": "image",
+            "description": "Фото с гембы 1",
+            "file_id": "chiho-gemba2"
+          },
+          {
+            "type": "image",
+            "description": "Фото с гембы 2",
+            "file_id": "chiho-gemba3"
+          },
+          {
+            "type": "image",
+            "description": "Фото с гембы 3",
+            "file_id": "chiho-gemba4"
+          },
+          {
+            "type": "image",
+            "description": "Фото с гембы 4",
+            "file_id": "chiho-gemba5"
+          },
+          {
+            "type": "image",
+            "description": "Фото с гембы 5",
+            "file_id": "chiho-gemba6"
+          }
+        ]            
+      },
+      "buttons": [
+        {"text": "😍", "value": "love_it"}
+      ],
+      "expected_input": {
+        "type": "button",
+        "variable": "gemba_photos_seen"
+      },
+      "next_step": "office_locations_intro"
+    },
+    "office_locations_intro": {
+      "id": "office_locations_intro",
+      "type": "message",
+      "message": {
+        "text": "А, чуть не забыл. У нас есть две офисные локации, о которых тебе важно знать."
+      },
+      "buttons": [
+        {"text": "👀", "value": "tell_me"}
+      ],
+      "expected_input": {
+        "type": "button",
+        "variable": "show_offices"
+      },
+      "next_step": "office_location_kk"
+    },
+    "office_location_kk": {
+      "id": "office_location_kk",
+      "type": "message",
+      "message": {
+        "text": "Офис на КК: Кривоколенный переулок, дом 10, стр. 6.\nРабочее пространство всех сотрудников офиса (кроме отдела кадров и бухгалтерии).\nЗдесь же проводим общие собрания/встречи и тренинги.",
+        "media": [
+          {
+            "type": "image",
+            "description": "Карта до офиса на КК",
+            "file_id": "chiho-office1"
+          }
+        ]  
+      },
+      "buttons": [
+        {"text": "✅ Понятно", "value": "ok"}
+      ],
+      "expected_input": {
+        "type": "button",
+        "variable": "office_kk_seen"
+      },
+      "next_step": "office_location_myasnitskaya"
+    },
+    "office_location_myasnitskaya": {
+      "id": "office_location_myasnitskaya",
+      "type": "message",
+      "message": {
+        "text": "Улица Мясницкая, дом 17, стр. 1.\nЗдесь наш второй офис, где сидит отдел кадров и бухгалтерия.\nСюда ты придешь подписывать трудовой договор.",
+        "media": [
+          {
+            "type": "image",
+            "description": "Карта до офиса на Мясницкой",
+            "file_id": "chiho-office2"
+          }
+        ]  
+      },
+      "buttons": [
+        {"text": "✅ Ок", "value": "ok"},
+        {"text": "⬅️ Главное меню", "value": "back_to_menu"}
+      ],
+      "expected_input": {
+        "type": "button",
+        "variable": "user_action"
+      },
+      "next_step": {
+        "type": "conditional",
+        "conditions": [
+          {
+            "if": "user_action == 'ok'",
+            "then": "intent://core/onboarding_completion/onboarding_finished"
+          },
+          {
+            "if": "user_action == 'back_to_menu'",
+            "then": "intent://navigation/main_menu/menu"
+          }
+        ]
+      }
+    }
+  }
+}

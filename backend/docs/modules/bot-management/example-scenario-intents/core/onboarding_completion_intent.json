@@ -1,0 +1,31 @@
+{
+  "intent_id": "onboarding_completion",
+  "intent_name": "Onboarding Completion and Final Steps",
+  "intent_type": "core",
+  "version": "1.0",
+  "dependencies": ["office_structure", "main_menu"],
+  "entry_points": ["onboarding_finished", "from_office_structure"],
+  "exit_points": ["proceed_to_menu"],
+  "context_requirements": {
+    "user_profile": "required",
+    "onboarding_status": "information_complete"
+  },
+  "start_step": "onboarding_finished",
+  "steps": {
+    "onboarding_finished": {
+      "id": "onboarding_finished",
+      "type": "message",
+      "message": {
+        "text": "Ну что ж, на этом пока всё.\nОтдыхай и набирайся сил, ведь скоро твоя первая смена в Чихо ❤\n\nВся информация остаётся здесь, и если нужно повторно изучить какую-то тему, то перейди в главное меню и выбери интересующий блок."
+      },
+      "buttons": [
+        {"text": "✅ Се-се", "value": "final_ok"}
+      ],
+      "expected_input": {
+        "type": "button",
+        "variable": "onboarding_finished"
+      },
+      "next_step": "intent://navigation/main_menu/menu"
+    }
+  }
+}

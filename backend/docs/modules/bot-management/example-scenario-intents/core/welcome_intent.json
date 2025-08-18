@@ -1,0 +1,34 @@
+{
+  "intent_id": "welcome",
+  "intent_name": "Welcome and Introduction",
+  "intent_type": "core",
+  "version": "1.0",
+  "dependencies": [],
+  "entry_points": ["start", "restart", "initial"],
+  "exit_points": ["proceed_to_registration"],
+  "context_requirements": {
+    "user_profile": "optional",
+    "onboarding_status": "not_started"
+  },
+  "start_step": "welcome",
+  "steps": {
+    "welcome": {
+      "id": "welcome",
+      "type": "message",
+      "message": {
+        "text": "Нихао 你好\nИ добро пожаловать в команду Чихо.\nМеня зовут ЧиХо, я помогу тебе освоиться в нашей компании.\nДавай знакомиться: как тебя зовут?"
+      },
+      "expected_input": {
+        "type": "text",
+        "variable": "first_name",
+        "validation": {
+          "min_length": 2,
+          "max_length": 50,
+          "pattern": "^[а-яА-ЯёЁa-zA-Z\\s-]+$",
+          "error_message": "Пожалуйста, введите корректное имя (только буквы, пробелы и дефисы)"
+        }
+      },
+      "next_step": "intent://core/user_registration/ask_lastname"
+    }
+  }
+}

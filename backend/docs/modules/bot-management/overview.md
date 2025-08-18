@@ -487,13 +487,29 @@ The bot management system has undergone comprehensive refactoring to improve mai
 - **User-friendly error recovery** with helpful correction messages
 - **Production-ready reliability** with graceful error handling
 
-#### 5. Architectural Utilities
+#### 5. Menu Navigation System
+- **Context-aware navigation** enabling information display without onboarding loops
+- **Progressive disclosure** with summary → details → complete content layers
+- **Direct menu return** from any information section
+- **Cross-section navigation** between related content areas
+- **Quick access patterns** with <3 clicks to any information
+- **Dual-purpose content** serving both onboarding and standalone contexts
+
+#### 6. Intent-Based Scenario Architecture
+- **Modular scenario splitting** breaking monolithic flows into focused intents
+- **Contemporary bot management** following Dialogflow, Rasa, and Bot Framework patterns
+- **Intent routing system** with `intent://` protocol for seamless transitions
+- **Context management** preserving state across intent boundaries
+- **Scalable development** enabling parallel work on different conversation aspects
+- **Reusable components** sharing common patterns across multiple bots
+
+#### 7. Architectural Utilities
 - **BaseService class** providing common CRUD operations
 - **Shared validation utilities** consolidating validation patterns
 - **User helper functions** eliminating duplicate user profile access
 - **Error context managers** for better error handling
 
-#### 6. Code Quality Improvements
+#### 8. Code Quality Improvements
 - **Reduced code duplication by 80%+**
 - **Improved separation of concerns** across components
 - **Better testability** with isolated, focused components

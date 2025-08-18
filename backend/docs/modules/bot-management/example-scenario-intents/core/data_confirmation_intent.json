@@ -1,0 +1,51 @@
+{
+  "intent_id": "data_confirmation",
+  "intent_name": "User Data Confirmation",
+  "intent_type": "core",
+  "version": "1.0",
+  "dependencies": ["user_registration"],
+  "entry_points": ["confirm_data", "from_registration"],
+  "exit_points": ["proceed_to_preparation", "restart_registration"],
+  "context_requirements": {
+    "user_profile": "required",
+    "collected_data": {
+      "first_name": "required",
+      "last_name": "required",
+      "citizenship": "required",
+      "position": "required",
+      "project": "required",
+      "first_shift_datetime": "required"
+    }
+  },
+  "start_step": "confirm_data",
+  "steps": {
+    "confirm_data": {
+      "id": "confirm_data",
+      "type": "message",
+      "message": {
+        "text": "Ce-ce\nДавай зафиналим:\nИмя: {{first_name}}\nФамилия: {{last_name}}\nДолжность: {{position}}\nПроект: {{project}}\nПервая стажировка: {{first_shift_datetime}}"
+      },
+      "buttons": [
+        {"text": "✅ Да, всё верно", "value": "yes"},
+        {"text": "✏️ Изменить данные", "value": "no"}
+      ],
+      "expected_input": {
+        "type": "button",
+        "variable": "data_confirmed"
+      },
+      "next_step": {
+        "type": "conditional",
+        "conditions": [
+          {
+            "if": "data_confirmed == 'yes'",
+            "then": "intent://core/first_day_preparation/first_day_instructions"
+          },
+          {
+            "if": "data_confirmed == 'no'",
+            "then": "intent://core/welcome/welcome"
+          }
+        ]
+      }
+    }
+  }
+}

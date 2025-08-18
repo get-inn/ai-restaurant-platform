@@ -929,6 +929,8 @@ class TestBotInputValidation:
 
 - **[Input Validation Overview](input-validation-overview.md)** - User-friendly introduction to input validation features
 - **[Bot Management Overview](overview.md)** - Complete system architecture and integration details
+- **[Menu Navigation Spec](menu-navigation-spec.md)** - Menu system that leverages input validation
+- **[Intent-Based Scenarios Spec](intent-based-scenarios-spec.md)** - Modular scenarios that use input validation
 - **[DialogManager Implementation](../../src/bot_manager/dialog_manager.py)** - See validation integration code
 - **[MediaManager](media-manager.md)** - Related component for media processing
 - **[Refactoring Plan](refactoring-plan.md)** - Implementation status and achievements

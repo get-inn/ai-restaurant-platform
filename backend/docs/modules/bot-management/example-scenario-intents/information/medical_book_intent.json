@@ -1,0 +1,90 @@
+{
+  "intent_id": "medical_book",
+  "intent_name": "Medical Book (ЛМК) Information",
+  "intent_type": "information",
+  "version": "1.0",
+  "dependencies": ["main_menu"],
+  "entry_points": ["lmk_intro", "from_menu", "from_onboarding"],
+  "exit_points": ["return_to_menu", "continue_to_support"],
+  "context_requirements": {
+    "user_profile": "optional",
+    "onboarding_status": "any"
+  },
+  "start_step": "lmk_intro",
+  "steps": {
+    "lmk_intro": {
+      "id": "lmk_intro",
+      "type": "message",
+      "message": {
+        "text": "Найс.\nЕщё хочу рассказать тебе про ЛМК."
+      },
+      "buttons": [
+        {"text": "❓ Это что такое?", "value": "what_is_lmk"}
+      ],
+      "expected_input": {
+        "type": "button",
+        "variable": "ask_about_lmk"
+      },
+      "next_step": "lmk_explanation"
+    },
+    "lmk_explanation": {
+      "id": "lmk_explanation",
+      "type": "message",
+      "message": {
+        "text": "ЛМК – это личная медицинская книжка.\nУ каждого работника общепита обязательно должна быть ЛМК со всеми пройденными, актуальными анализами, которые делаются 1 раз в год."
+      },
+      "buttons": [
+        {"text": "💳 Это платно?", "value": "is_it_paid"}
+      ],
+      "expected_input": {
+        "type": "button",
+        "variable": "ask_lmk_payment"
+      },
+      "next_step": "lmk_payment"
+    },
+    "lmk_payment": {
+      "id": "lmk_payment",
+      "type": "message",
+      "message": {
+        "text": "Да, прохождение всех анализов обойдется примерно в 5 000 рублей (может быть чуть больше, это зависит от назначенных анализов и прививок).\n\nПодытожим:\n- 1-я мед. книжка за счёт сотрудника (самостоятельная оплата или оплата по безналу с последующим изъятием из ЗП).\n- Продление (через год) – за счёт компании.\n\nНа проекте тебе выдадут направление на медосмотр. Ты пройдешь медосмотр, и ничего платить не надо будет, так как заплатит компания, но эти деньги спишутся из твоей первой ЗП."
+      },
+      "buttons": [
+        {"text": "А если у меня не будет денег?", "value": "what_if_no_money"},
+        {"text": "Каждый год платить за продление?", "value": "pay_every_year"}
+      ],
+      "expected_input": {
+        "type": "button",
+        "variable": "lmk_follow_up_questions"
+      },
+      "next_step": "lmk_payment_answers"
+    },
+    "lmk_payment_answers": {
+      "id": "lmk_payment_answers",
+      "type": "message",
+      "message": {
+        "text": "На проекте тебе выдадут направление, компания оплатит осмотр, а сумма будет вычтена из твоей первой зарплаты.\n\nНет, все последующие продления ЛМК за счет компании."
+      },
+      "buttons": [
+        {"text": "✅ Понятно", "value": "ok"},
+        {"text": "⬅️ Главное меню", "value": "back_to_menu"}
+      ],
+      "expected_input": {
+        "type": "button",
+        "variable": "user_action"
+      },
+      "next_step": {
+        "type": "conditional",
+        "conditions": [
+          {
+            "if": "user_action == 'ok'",
+            "then": "intent://support/contacts/support_contacts"
+          },
+          {
+            "if": "user_action == 'back_to_menu'",
+            "then": "intent://navigation/main_menu/menu"
+          }
+        ]
+      }
+    }
+  }
+}

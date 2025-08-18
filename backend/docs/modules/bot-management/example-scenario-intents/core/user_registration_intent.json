@@ -1,0 +1,111 @@
+{
+  "intent_id": "user_registration",
+  "intent_name": "User Registration and Data Collection",
+  "intent_type": "core",
+  "version": "1.0",
+  "dependencies": ["welcome"],
+  "entry_points": ["ask_lastname", "from_welcome"],
+  "exit_points": ["proceed_to_confirmation"],
+  "context_requirements": {
+    "user_profile": "required",
+    "collected_data": {
+      "first_name": "required"
+    }
+  },
+  "start_step": "ask_lastname",
+  "steps": {
+    "ask_lastname": {
+      "id": "ask_lastname",
+      "type": "message",
+      "message": {
+        "text": "Напиши свою фамилию."
+      },
+      "expected_input": {
+        "type": "text",
+        "variable": "last_name",
+        "validation": {
+          "min_length": 2,
+          "max_length": 50,
+          "pattern": "^[а-яА-ЯёЁa-zA-Z\\s-]+$",
+          "error_message": "Пожалуйста, введите корректную фамилию (только буквы, пробелы и дефисы)"
+        }
+      },
+      "next_step": "ask_citizenship"
+    },
+    "ask_citizenship": {
+      "id": "ask_citizenship",
+      "type": "message",
+      "message": {
+        "text": "Гражданство."
+      },
+      "buttons": [
+        {"text": "🇷🇺 РФ", "value": "rf"},
+        {"text": "🌏 СНГ", "value": "cis"}
+      ],
+      "expected_input": {
+        "type": "button",
+        "variable": "citizenship"
+      },
+      "next_step": "ask_position"
+    },
+    "ask_position": {
+      "id": "ask_position",
+      "type": "message",
+      "message": {
+        "text": "Кем ты работаешь в Чихо?"
+      },
+      "buttons": [
+        {"text": "🍜 Фуд-гид", "value": "food-guide"},
+        {"text": "🔪 Повар", "value": "cook"},
+        {"text": "📋 Менеджер", "value": "manager"},
+        {"text": "🤓 Я из офиса", "value": "office"}
+      ],
+      "expected_input": {
+        "type": "button",
+        "variable": "position"
+      },
+      "next_step": "ask_project"
+    },
+    "ask_project": {
+      "id": "ask_project",
+      "type": "message",
+      "message": {
+        "text": "На каком проекте ты будешь работать?"
+      },
+      "buttons": [
+        {"text": "Пятницкая", "value": "pyatnitskaya"},
+        {"text": "Пушкинская", "value": "pushkinskaya"},
+        {"text": "Мясницкая", "value": "myasnitskaya"},
+        {"text": "Цв Авиапарк", "value": "cv_aviapark"},
+        {"text": "ЦР Артплей", "value": "cr_artplay"},
+        {"text": "Новослободская", "value": "novoslobodskaya"},
+        {"text": "Белорусская", "value": "belorusskaya"},
+        {"text": "Сити 1", "value": "city1"},
+        {"text": "Сити 2", "value": "city2"},
+        {"text": "Сретенка", "value": "sretenka"},
+        {"text": "КО Покровка", "value": "ko_pokrovka"}
+      ],
+      "expected_input": {
+        "type": "button",
+        "variable": "project"
+      },
+      "next_step": "ask_first_shift"
+    },
+    "ask_first_shift": {
+      "id": "ask_first_shift",
+      "type": "message",
+      "message": {
+        "text": "Когда твой первый стажировочный день?\nНапиши в формате дата и время: 10.06 10:00"
+      },
+      "expected_input": {
+        "type": "text",
+        "variable": "first_shift_datetime",
+        "validation": {
+          "pattern": "^\\d{1,2}\\.\\d{1,2}\\s+\\d{1,2}:\\d{2}$",
+          "error_message": "Пожалуйста, введите дату и время в формате: 10.06 10:00"
+        }
+      },
+      "next_step": "intent://core/data_confirmation/confirm_data"
+    }
+  }
+}
